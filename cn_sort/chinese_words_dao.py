@@ -1,7 +1,7 @@
 from peewee import *
 import sqlite3
 from cn_sort.decorator import *
-from cn_sort.cn_sort import *
+from cn_sort.process_cn_word import *
 import logging
 
 # 这个模块主要用来操作chinese_words.db与chinese_words_backup.db。
