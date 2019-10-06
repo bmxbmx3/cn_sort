@@ -4,13 +4,11 @@ setup(
     packages=["cn_sort"],
     version="0.1",
     license="MIT",
-    # Give a short description about your library
-    description="按拼音和笔顺快速排序大量简体中文词组（支持百万数量级）的程序。",
+    description="按拼音和笔顺快速排序大量简体中文词组（支持百万数量级）。",
     author="bmxbmx3",
     author_email="982766639@qq.com",
     url="https://github.com/bmxbmx3/cn_sort/tree/master",
-    download_url="https://github.com/user/reponame/archive/v_01.tar.gz",
-        # I explain this later on
+    download_url="https://github.com/bmxbmx3/cn_sort/archive/0.1.zip",
     keywords=[
         "njupt",
         "排序",
@@ -27,7 +25,6 @@ setup(
         "bihua"],
     install_requires=[
         "peewee",
-        "sqlite3",
         "pypinyin",
         "jieba",
     ],
