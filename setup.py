@@ -8,7 +8,7 @@ setup(
     author="bmxbmx3",
     author_email="982766639@qq.com",
     url="https://github.com/bmxbmx3/cn_sort/tree/master",
-    download_url="https://github.com/bmxbmx3/cn_sort/archive/0.1.zip",
+    download_url="https://github.com/bmxbmx3/cn_sort/archive/v0.1.zip",
     keywords=[
         "njupt",
         "排序",
