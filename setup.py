@@ -2,13 +2,13 @@ from distutils.core import setup
 setup(
     name="cn_sort",
     packages=["cn_sort"],
-    version="0.2",
+    version="0.3",
     license="MIT",
     description="按拼音和笔顺快速排序大量简体中文词组（支持百万数量级）。",
     author="bmxbmx3",
     author_email="982766639@qq.com",
     url="https://github.com/bmxbmx3/cn_sort/tree/master",
-    download_url="https://github.com/bmxbmx3/cn_sort/archive/v0.1.zip",
+    download_url="https://github.com/bmxbmx3/cn_sort/archive/v0.3.zip",
     keywords=[
         "njupt",
         "排序",
