@@ -22,11 +22,12 @@ setup(
         "sort",
         "pinyin",
         "pronounce",
-        "bihua"],
+        "bihua"
+    ],
     install_requires=[
         "peewee",
         "pypinyin",
-        "jieba",
+        "jieba"
     ],
     classifiers=[
         "Development Status :: 5 - Production/Stable",
