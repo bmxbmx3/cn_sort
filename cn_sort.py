@@ -273,3 +273,8 @@ def sort_text_list(text_list):
             seged_text_word_iter, max_length, filter_word_dict)
 
     return reslut_text_iter
+
+if __name__=="__main__":
+    text_list = ["人群", "河水", "人", "河流", "WTO世贸组织"]
+    result_text_list=list(sort_text_list(text_list))
+    print(result_text_list)
