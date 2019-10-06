@@ -6,7 +6,7 @@ import logging
 
 # 这个模块主要用来操作chinese_words.db与chinese_words_backup.db。
 
-db = SqliteDatabase("chinese_words.db")
+db = SqliteDatabase("./chinese_words.db")
 
 
 class all_word(Model):
@@ -156,7 +156,7 @@ def backup(src_name, dst_name):
     logging.info("%s数据库成功备份到%s数据库" % (src_name, dst_name))
 
 
-@db_connnect("chinese_words.db")
+@db_connnect("./chinese_words.db")
 @metric_time
 def get_word_dict():
     """

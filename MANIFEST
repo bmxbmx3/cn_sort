@@ -2,8 +2,8 @@
 setup.cfg
 setup.py
 cn_sort\__init__.py
+cn_sort\chinese_words.db
+cn_sort\chinese_words_backup.db
 cn_sort\chinese_words_dao.py
 cn_sort\decorator.py
 cn_sort\process_cn_word.py
-cn_sort\chinese_words.db
-cn_sort\chinese_words_backup.db
