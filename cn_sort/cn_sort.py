@@ -1,5 +1,5 @@
-from chinese_words_dao import *
-from decorator import *
+from cn_sort.chinese_words_dao import *
+from cn_sort.decorator import *
 from pypinyin import Style
 import pypinyin
 import re
