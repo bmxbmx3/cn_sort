@@ -2,7 +2,7 @@ from distutils.core import setup
 setup(
     name="cn_sort",
     packages=["cn_sort"],
-    version="0.1",
+    version="0.2",
     license="MIT",
     description="按拼音和笔顺快速排序大量简体中文词组（支持百万数量级）。",
     author="bmxbmx3",
