@@ -162,7 +162,7 @@ def get_filter_word_evaluation_process(queue_list):
 
 # 多进程处理文本，text_list每个元素必须以"\n"结尾
 @metric_time
-def multiprocess_split_text_list(text_split_list):
+def multiprocess_split_text_list(text_split_list,freeze=False):
     """
     多个生产者、一个消费者的多进程分割文本。
     :param text_split_list: 待处理分段的文本组成的列表。
@@ -175,6 +175,9 @@ def multiprocess_split_text_list(text_split_list):
     queue_list = [Manager().Queue(maxsize=0)] * n       # 分多个队列，解决进程间通信时数据丢失的问题
     args_list = [(text_split_list[i], queue_list[i], i + 1)
                  for i in range(3)] + [(queue_list,)]       # 参数列表
+    # 如果用户确定不用 if __name__=="__main__" 方式运行多进程，则设置freeze=True来防止多进程切换出现错误
+    if freeze:
+        freeze_support()  # Windows 平台要加上这句，初始化pool，避免 RuntimeError，这是因为windows的API不包含fork()等函数。
     p = Pool(n + 1)       # 充分利用所有cpu
     for i in range(n + 1):
         a = p.apply_async(func=process_list[i], args=args_list[i])
@@ -290,10 +293,11 @@ def get_text_spit_list(text_list):
 
 
 @metric_time
-def sort_text_list(text_list):
+def sort_text_list(text_list,freeze=False):
     """
     排序汉字词组的列表，形如["人","人民"]，每个词的末尾不加”\n“。
     :param text_list: 汉字词组的列表。
+    :param freeze:运行多进程时如果不在 if __name__=="__main__" ，该选项设置为True保护进程切换
     :return: 排序完的汉字词组的列表。
     """
     reslut_text_iter = []  # 存储排序后的迭代结果
@@ -305,10 +309,14 @@ def sort_text_list(text_list):
     else:
         # 数据量大于500000用多进程
         text_split_text = get_text_spit_list(text_list)
-        seged_text_word_iter, filter_word_dict, max_length = multiprocess_split_text_list(
-            text_split_text)
-        reslut_text_iter = hadle_seged_text_word(
-            seged_text_word_iter, max_length, filter_word_dict)
+        try:
+            seged_text_word_iter, filter_word_dict, max_length = multiprocess_split_text_list(
+                text_split_text,freeze)
+        except RuntimeError:
+            logging.info("进程切换频繁出现错误，请设置sort_text_list函数的freeze参数为True，或者多进程任务在 if __name__==\"__main__\" 水平下执行")
+        else:
+            reslut_text_iter = hadle_seged_text_word(
+                seged_text_word_iter, max_length, filter_word_dict)
 
     return reslut_text_iter
 
