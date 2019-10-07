@@ -6,7 +6,7 @@ import logging
 
 # 这个模块主要用来操作chinese_words.db与chinese_words_backup.db。
 
-db = SqliteDatabase("./chinese_words.db")
+db = SqliteDatabase("res/chinese_words.db")
 
 
 class all_word(Model):
