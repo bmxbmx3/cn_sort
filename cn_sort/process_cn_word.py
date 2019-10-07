@@ -35,7 +35,7 @@ def get_word_dict():
     # with zipfile.ZipFile("cn_sort-0.5.5.tar.gz", "r") as zip:
     #     # 从打包的egg文件读取csv文件
     #     with zip.open("cn_sort/all_word.csv", "r",) as f:
-    #         text = f.read().decode(encoding="utf-8")
+    #         text = f.read().decode(encoding="utf-8")      # 转换utf-8为了中文字符编码能够显示
     #         text_file = StringIO(text)
     #         csv_reader = csv.DictReader(text_file,delimiter="\t",quotechar='$')
     #         for row in csv_reader:
@@ -105,6 +105,7 @@ def handle_text_process(text, queue, process_id):
     temp_text_list = []        # 暂时存储一个词
     jieba.setLogLevel(20)       # 抑制jieba日志消息
     seged_word_list = list(jieba.cut(text))
+
     # 将分割后的词放入队列中
     word_set = set()        # 存储不重复的词的集合，用于过滤
     for word in seged_word_list:
@@ -312,6 +313,6 @@ def sort_text_list(text_list):
     return reslut_text_iter
 
 if __name__=="__main__":
-    text_list = ["人群", "河水", "人", "河流", "WTO世贸组织"]
+    text_list = ["人群", "河水", "人", "河流", "WTO世贸组织","njupt"]
     result_text_list=list(sort_text_list(text_list))
     print(result_text_list)
