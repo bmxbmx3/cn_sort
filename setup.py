@@ -13,7 +13,7 @@ setup(
     author="bmxbmx3",
     author_email="982766639@qq.com",
     url="https://github.com/bmxbmx3/cn_sort/tree/master",
-    download_url="https://github.com/bmxbmx3/cn_sort/archive/0.4.2b2.tar.gz",
+    download_url="https://github.com/bmxbmx3/cn_sort/archive/v0.4.2b2.tar.gz",
     keywords=[
         "njupt chinese word sort pronounce bihua 排序 中文 拼音 笔画 笔顺 词 汉字",
     ],
