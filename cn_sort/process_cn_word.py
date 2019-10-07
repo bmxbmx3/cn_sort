@@ -311,7 +311,7 @@ def sort_text_list(text_list,freeze=False):
         text_split_text = get_text_spit_list(text_list)
         try:
             seged_text_word_iter, filter_word_dict, max_length = multiprocess_split_text_list(
-                text_split_text,freeze)
+                text_split_text,freeze=freeze)
         except RuntimeError:
             logging.info("进程切换频繁出现错误，请设置sort_text_list函数的freeze参数为True，或者多进程任务在 if __name__==\"__main__\" 水平下执行")
         else:
