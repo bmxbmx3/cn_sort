@@ -1,4 +1,3 @@
-from cn_sort.chinese_words_dao import *
 from cn_sort.decorator import *
 from pypinyin import Style
 import pypinyin
@@ -8,9 +7,43 @@ from multiprocessing.pool import Pool
 from multiprocessing import *
 import logging
 from itertools import *
+import csv
+import os
+import zipfile
+from io import StringIO
 
 # 这个模块主要存放对词组列表的一些操作。
 
+@metric_time
+def get_word_dict():
+    """
+    获取所有字的索引表。
+    :return: 所有字的索引表。
+    """
+    # 因为要给pypi打包成egg压缩文件，读取要用zipfile，如果不打包，用注释中的代码读取索引表
+    word_dict = {}      # 用于对照的索引词典
+    current_package_path=os.path.dirname(os.path.abspath(__file__))        # 获得当前包所在的绝对路径，很重要！！！识别不出来就很麻烦
+    with open("".join([current_package_path,"\\","all_word.csv"]), mode='r',encoding="utf-8") as csv_file:
+        csv_reader = csv.DictReader(csv_file,delimiter="\t",quotechar='$')
+        for row in csv_reader:
+            key=row["signature"]
+            value=int(row["evaluation_level"])
+            word_dict[key]=value
+
+    # 打包成egg时读取csv文件的方法
+    # word_dict = {}  # 用于对照的索引词典
+    # with zipfile.ZipFile("cn_sort-0.5.5.tar.gz", "r") as zip:
+    #     # 从打包的egg文件读取csv文件
+    #     with zip.open("cn_sort/all_word.csv", "r",) as f:
+    #         text = f.read().decode(encoding="utf-8")
+    #         text_file = StringIO(text)
+    #         csv_reader = csv.DictReader(text_file,delimiter="\t",quotechar='$')
+    #         for row in csv_reader:
+    #             key=row["signature"]
+    #             value=int(row["evaluation_level"])
+    #             word_dict[key]=value
+
+    return word_dict
 
 def get_evaluation_level_tuple(word, word_dict, pattern):
     """
@@ -99,6 +132,10 @@ def get_filter_word_evaluation_process(queue_list):
     :param queue_list: 装有队列的列表。
     :return:文本经分割后的不重复的词按词典查询所得的索引表。
     """
+    # multiprocessing不同类型的多线程使用队列的区别：
+    # pool.Pool() 共享变量使用队列时一定用multiprocessing.Manager().Queue()。
+    # Process()用multiprocessing.Queue()。
+
     filter_word_dict = {}     # 过滤后不重复的词映射表组成的索引词典
     word_dict = get_word_dict()  # 从数据库获得所有词的索引词典
     queue_count = len(queue_list)       # 队列数量

@@ -1,1 +1,7 @@
-include *.cfg *.py *.md
+include setup.cfg
+include setup.py
+include README.md
+include LICENSE
+include cn_sort/chinese_words.csv
+include cn_sort/decorator.py
+include cn_sort/process_cn_word.py

@@ -1,28 +1,8 @@
-from time import *
-import functools
-from peewee import *
 import logging
+from time import *
+import pandas as pd
 
 # 这个模块主要用来放一些装饰器的函数。
-
-
-def db_connnect(text):
-    """
-    连接sqlite数据库的装饰器。
-    :param text: 要连接的数据库名。
-    :return: None。
-    """
-    def decorator(func):
-        @functools.wraps(func)
-        def wrapper(*args, **kwargs):
-            db = SqliteDatabase(text)
-            db.connect()
-            result = func(*args, **kwargs)
-            db.close()
-            return result
-        return wrapper
-    return decorator
-
 
 def set_log_cofig(func):
     """
