@@ -1,9 +1,15 @@
 from setuptools import setup,find_packages
 
+with open("README.md", "r") as fh:
+    long_description = fh.read()
+
 setup(
+    name="cn_sort",
     version="0.4.2b1",
     license="MIT",
     description="按拼音和笔顺快速排序大量简体中文词组（支持百万数量级）。",
+    long_description=long_description,
+    long_description_content_type="text/markdown",
     author="bmxbmx3",
     author_email="982766639@qq.com",
     url="https://github.com/bmxbmx3/cn_sort/tree/master",
