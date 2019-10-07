@@ -31,9 +31,9 @@ setup(
         "Programming Language :: Python :: 3.7"
     ],
     package_data={
-        "cn_sort": ["res/*.db"]
+        "main": ["res/*.db"]
     },
     package_dir={"": "cn_sort"},
-    packages=find_packages("cn_sort"),
+    packages=find_packages(include=['cn_sort.*']),
     python_requires=">=3.6"
 )
