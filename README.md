@@ -6,6 +6,12 @@
 
 适用于3.6+的python版本。
 
+依赖：
++ jieba
++ pypinyin
+
+pip命令：
+
 ```
 pip install cn_sort --upgrade
 ```
