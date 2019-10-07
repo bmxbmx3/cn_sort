@@ -142,7 +142,7 @@ def backup(src_name, dst_name):
     """
     备份数据库。
     用法：
-        backup("chinese_words.db","chinese_words_backup.db")
+        backup("res/chinese_words.db","res/chinese_words_backup.db")
     :param src_name:源数据库名。
     :param dst_name:目标数据库名。
     :return:None。
@@ -156,7 +156,7 @@ def backup(src_name, dst_name):
     logging.info("%s数据库成功备份到%s数据库" % (src_name, dst_name))
 
 
-@db_connnect("./chinese_words.db")
+@db_connnect("res/chinese_words.db")
 @metric_time
 def get_word_dict():
     """
