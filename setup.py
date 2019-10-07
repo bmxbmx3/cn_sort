@@ -1,11 +1,11 @@
 from setuptools import setup,find_packages
 
-with open("README.md", "r") as fh:
+with open("README.md", "r",encoding="utf-8") as fh:
     long_description = fh.read()
 
 setup(
     name="cn_sort",
-    version="0.4.2b1",
+    version="0.4.2b2",
     license="MIT",
     description="按拼音和笔顺快速排序大量简体中文词组（支持百万数量级）。",
     long_description=long_description,
@@ -13,7 +13,7 @@ setup(
     author="bmxbmx3",
     author_email="982766639@qq.com",
     url="https://github.com/bmxbmx3/cn_sort/tree/master",
-    download_url="https://github.com/bmxbmx3/cn_sort/archive/0.4.2b1.tar.gz",
+    download_url="https://github.com/bmxbmx3/cn_sort/archive/0.4.2b2.tar.gz",
     keywords=[
         "njupt chinese word sort pronounce bihua 排序 中文 拼音 笔画 笔顺 词 汉字",
     ],
