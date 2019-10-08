@@ -32,7 +32,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="cn_sort",
-    version="0.6.0",
+    version="0.6.1",
     license="MIT",
     description="按拼音和笔顺快速排序大量简体中文词组（支持百万数量级）。",
     long_description=long_description,
@@ -40,7 +40,7 @@ setup(
     author="bmxbmx3",
     author_email="982766639@qq.com",
     url="https://github.com/bmxbmx3/cn_sort/tree/master",
-    download_url="https://github.com/bmxbmx3/cn_sort/releases",
+    download_url="https://pypi.org/project/cn-sort/#files",
     keywords=[
         "njupt chinese word sort pronounce bihua 排序 中文 拼音 笔画 笔顺 词 汉字",
     ],
