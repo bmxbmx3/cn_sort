@@ -6,6 +6,7 @@ import jieba
 from multiprocessing.pool import Pool
 from multiprocessing import *
 import logging
+import logging.config
 from itertools import *
 import csv
 import os
@@ -13,6 +14,12 @@ import zipfile
 from io import StringIO
 
 # 这个模块主要存放对词组列表的一些操作。
+
+# 读取日志配置文件内容
+current_package_path = os.path.dirname(os.path.abspath(__file__))  # 获得当前包所在的绝对路径，很重要！！！识别不出来就很麻烦
+logging.config.fileConfig("".join([current_package_path, "\\res\\logging.conf"]))
+logger_all=logging.getLogger("all")        # 写入all.log
+logger_error=logging.getLogger("error")        # 写入error.log
 
 @metric_time
 def get_word_dict():
@@ -23,7 +30,7 @@ def get_word_dict():
     # 因为要给pypi打包成egg压缩文件，读取要用zipfile，如果不打包，用注释中的代码读取索引表
     word_dict = {}      # 用于对照的索引词典
     current_package_path=os.path.dirname(os.path.abspath(__file__))        # 获得当前包所在的绝对路径，很重要！！！识别不出来就很麻烦
-    with open("".join([current_package_path,"\\","all_word.csv"]), mode='r',encoding="utf-8") as csv_file:
+    with open("".join([current_package_path,"\\res\\all_word.csv"]), mode='r',encoding="utf-8") as csv_file:
         csv_reader = csv.DictReader(csv_file,delimiter="\t",quotechar='$')
         for row in csv_reader:
             key=row["signature"]
@@ -85,7 +92,7 @@ def get_evaluation_level_tuple(word, word_dict, pattern):
             evaluation_level = word_dict[signature]
         except KeyError:
             # 找不到索引进行相应处理
-            logging.error("无法找到词语“%s”中的拼音索引为“%s”" % (word, signature))
+            logger_error.error("无法找到词语“%s”中的拼音索引为“%s”" % (word, signature))
         finally:
             evaluation_level_list.append(evaluation_level)
 
@@ -122,7 +129,7 @@ def handle_text_process(text, queue, process_id):
             queue.put(word)
 
     queue.put(None)  # 进程完成结束标志，向队列添加
-    logging.info("分词进程%d已切割%d个不重复的词" % (process_id, len(word_set)))
+    logger_all.info("分词进程%d已切割%d个不重复的词" % (process_id, len(word_set)))
 
     return seged_word_list, max_length
 
@@ -147,7 +154,7 @@ def get_filter_word_evaluation_process(queue_list):
     while True:
         # 多个队列停止接收
         if word_list.count(None) == queue_count:
-            logging.info("分词总结果为%d个不重复的词" % (len(filter_word_dict),))
+            logger_all.info("分词总结果为%d个不重复的词" % (len(filter_word_dict),))
             break
         for i in range(queue_count):
             if word_list[i] is not None:
@@ -282,7 +289,7 @@ def get_text_spit_list(text_list):
     n = cpu_count() - 1        # 由cpu数决定文本分段的个数
     quotient, remainder = divmod(len(text_list), n)
     if n <= 2:
-        logging.error("机器的cpu数为%d，无法处理大量文本的数据" % (n + 1,))
+        logger_error.error("机器的cpu数为%d，无法处理大量文本的数据" % (n + 1,))
         text_split_list = None
     for i in range(n):
         first_index = i * quotient
@@ -313,7 +320,7 @@ def sort_text_list(text_list,freeze=False):
             seged_text_word_iter, filter_word_dict, max_length = multiprocess_split_text_list(
                 text_split_text,freeze=freeze)
         except RuntimeError:
-            logging.info("进程切换频繁出现错误，请设置sort_text_list函数的freeze参数为True，或者多进程任务在 if __name__==\"__main__\" 水平下执行")
+            logger_error.error("进程切换频繁出现错误，请设置sort_text_list函数的freeze参数为True，或者多进程任务在 if __name__==\"__main__\" 水平下执行")
         else:
             reslut_text_iter = hadle_seged_text_word(
                 seged_text_word_iter, max_length, filter_word_dict)
@@ -321,6 +328,13 @@ def sort_text_list(text_list,freeze=False):
     return reslut_text_iter
 
 if __name__=="__main__":
-    text_list = ["人群", "河水", "人", "河流", "WTO世贸组织","njupt"]
-    result_text_list=list(sort_text_list(text_list))
-    print(result_text_list)
+    with open("test.txt","r",encoding="utf-8") as f:
+        lines=[]
+        while True:
+            line=f.readline()
+            if line:
+                line=line.strip("\n")
+                lines.append(line)
+            else:
+                break
+        result_text_list=list(sort_text_list(lines))
