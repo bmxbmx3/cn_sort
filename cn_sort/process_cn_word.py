@@ -1,17 +1,17 @@
-from cn_sort.decorator import *
-from pypinyin import Style
-import pypinyin
-import re
-import jieba
-from multiprocessing.pool import Pool
-from multiprocessing import *
-import logging
-import logging.config
-from itertools import *
 import csv
+import logging.config
 import os
-import zipfile
-from io import StringIO
+import re
+from itertools import *
+from multiprocessing import *
+from multiprocessing.pool import Pool
+
+import jieba
+import pypinyin
+from pypinyin import Style
+
+from cn_sort.decorator import *
+import configparser
 
 # 这个模块主要存放对词组列表的一些操作。
 
@@ -308,6 +308,9 @@ def sort_text_list(text_list,freeze=False):
     :return: 排序完的汉字词组的列表。
     """
     reslut_text_iter = []  # 存储排序后的迭代结果
+    # 如果列表为空返回空列表
+    if text_list==[]:
+        return []
     text_list = ["".join([i, "\n"]) for i in text_list]  # 添加”\n“做分割标志
     # 根据词的集合的大小进行相应的多进程/单进程操作
     if len(text_list) <= 500000:
@@ -327,14 +330,25 @@ def sort_text_list(text_list,freeze=False):
 
     return reslut_text_iter
 
+def set_stdout_level(level):
+    """
+    设置终端输出日志信息的级别。
+    :param level: 日志信息的级别，如“DEBUG”等。
+    :return: 操作成功与否的布尔标志。
+    """
+    current_package_path = os.path.dirname(os.path.abspath(__file__))  # 获得当前包所在的绝对路径，很重要！！！识别不出来就很麻烦
+    logging_file_path="".join([current_package_path, "\\res\\logging.conf"])  # 日志配置文件路径
+    cfg=configparser.ConfigParser()
+    cfg.read(logging_file_path)
+    status=False  # 日志级别配置成功标志
+    # 保证输入的级别字符串落在日志级别的范围内
+    if level in ["DEBUG","INFO","WARN","ERROR","CRITICAL"]:
+        cfg.set("handler_streamHandler","level",level)
+        with open(logging_file_path,"w",encoding="utf-8") as cfg_file:
+            cfg.write(cfg_file)
+        status=True
+    return status
+
 if __name__=="__main__":
-    with open("test.txt","r",encoding="utf-8") as f:
-        lines=[]
-        while True:
-            line=f.readline()
-            if line:
-                line=line.strip("\n")
-                lines.append(line)
-            else:
-                break
-        result_text_list=list(sort_text_list(lines))
+    set_stdout_level("CRITICAL")
+    print(list(sort_text_list(["→","重庆"])))
