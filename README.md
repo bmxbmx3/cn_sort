@@ -19,8 +19,15 @@ pip安装命令：
 pip install cn_sort --upgrade
 ```
 
+如果提示缺少依赖，运行以下命令：
+
+```
+pip install -r requirements.txt
+```
 
 # 使用
+
+## 入门
 
 ```
 from cn_sort.process_cn_word import *
@@ -33,7 +40,11 @@ print(result_text_list)
 # ['WTO世贸组织', '重庆', '河流', '河水', '重心']
 ```
 
-具体使用见函数注释。
+## 设置输出日志级别
+
+```
+set_stdout_level("CRITICAL")        # 日志级别：DEBUG、INFO、WARN、ERROR、CRITIAL
+```
 
 # 构思
 
