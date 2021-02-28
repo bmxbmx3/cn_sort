@@ -1,0 +1,25 @@
+@startdot
+digraph text {
+    rankdir=TB
+    node[fontname="Microsoft YaHei",shape=box]
+
+    input_word_list->{producer_thread1,producer_thread2,producer_thread3}
+    producer_thread3[label="..."]
+    producer_thread1->queue1
+    producer_thread2->queue2
+    producer_thread3->queue3
+    queue3[label="..."]
+    {queue1,queue2,queue3}->consumer_thread->get_word_index_dict->mapped_word_index_list
+    input_word_list->mapped_word_index_list->sort_word_list->output_sorted_word_list
+    {rank=same;producer_thread1;producer_thread2;producer_thread3}
+    {rank=same;queue1;queue2;queue3}
+    producer_thread1[label=""]
+    producer_thread2[label=""]
+     queue1[label=""]
+     queue2[label=""]
+
+
+
+}
+
+@enddot

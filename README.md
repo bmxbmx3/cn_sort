@@ -48,14 +48,7 @@ set_stdout_level("CRITICAL")        # 日志级别：DEBUG、INFO、WARN、ERROR
 
 # 构思
 
-```plantuml
-@startdot
-digraph text {
-    node[fontname="Times-Roman"]
-    a->b[label=我们]
-}
-@enddot
-```
+
 
 # 来源
 
