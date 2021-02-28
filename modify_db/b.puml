@@ -1,0 +1,16 @@
+@startuml
+
+
+    subgraph cluster_producer_thread{
+        fontname="Microsoft YaHei"
+        label="producer thread"
+        segement_word_list->segement_word_element->filter_duplicate_subword
+    }
+    subgraph cluster_consumer_thread{
+        fontname="Microsoft YaHei"
+        label="consumer thread"
+        get_filtered_subword
+    }
+
+
+@enduml
