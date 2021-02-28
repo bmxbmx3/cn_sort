@@ -130,7 +130,7 @@ cn_sort库当词组量多时，采用多进程提高运算速度。先将词组�
 
 <div align="center">
   <img src="https://github.com/bmxbmx3/cn_sort/blob/master/readme_pic/all_word%E8%A1%A8.png" width="60%"/>
-  <br>word表</br>
+  <br>all_word表</br>
   <br></br>
 </div>
 
