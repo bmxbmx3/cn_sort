@@ -1,0 +1,16 @@
+2019-10-31 00:34:29,364 - all - INFO - handle_text_word函数运行时间为0.000000s
+2019-10-31 00:34:29,372 - all - INFO - sort_text_list函数运行时间为0.006965s
+2019-10-31 00:34:29,921 - all - INFO - get_word_dict函数运行时间为0.540689s
+2019-10-31 00:34:29,929 - all - INFO - radix_sort函数运行时间为0.000000s
+2019-10-31 00:34:47,620 - all - INFO - handle_text_word函数运行时间为0.000000s
+2019-10-31 00:34:47,628 - all - INFO - sort_text_list函数运行时间为0.006966s
+2019-10-31 00:34:48,192 - all - INFO - get_word_dict函数运行时间为0.554680s
+2019-10-31 00:34:48,202 - all - INFO - radix_sort函数运行时间为0.000000s
+2021-02-28 17:15:10,052 - all - INFO - handle_text_word函数运行时间为0.000000s
+2021-02-28 17:15:10,054 - all - INFO - sort_text_list函数运行时间为0.001998s
+2021-02-28 17:15:10,143 - all - INFO - get_word_dict函数运行时间为0.086998s
+2021-02-28 17:15:10,145 - all - INFO - radix_sort函数运行时间为0.000000s
+2021-02-28 17:15:20,104 - all - INFO - handle_text_word函数运行时间为0.000000s
+2021-02-28 17:15:20,106 - all - INFO - sort_text_list函数运行时间为0.001967s
+2021-02-28 17:15:20,195 - all - INFO - get_word_dict函数运行时间为0.086999s
+2021-02-28 17:15:20,197 - all - INFO - radix_sort函数运行时间为0.000000s
