@@ -48,7 +48,7 @@ set_stdout_level("CRITICAL")        # 日志级别：DEBUG、INFO、WARN、ERROR
 
 # 构思
 
-cn_sort库的核心思想是基数排序，思想类似这篇提到的对英文单词的排序： [Java 实现 单词排序———基数排序](https://www.jianshu.com/p/3331930a90bf) 。
+cn_sort库的核心思想是基数排序，思想类似这篇提到的对英文单词的排序： [Java 实现 单词排序———基数排序](https://www.jianshu.com/p/3331930a90bf) 。设定是对词从左往右逐字先对比拼音，再对比笔顺的排序方式。
 
 cn_sort库分为词组量少与词组量多的排序方式，这两种方式默认的词组量阈值为500000。
 
