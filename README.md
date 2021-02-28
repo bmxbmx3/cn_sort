@@ -48,13 +48,17 @@ set_stdout_level("CRITICAL")        # 日志级别：DEBUG、INFO、WARN、ERROR
 
 # 构思
 
-cn_sort库的核心思想是基数排序，思想类似这篇提到的对英文单词的排序： [Java 实现 单词排序———基数排序](https://www.jianshu.com/p/3331930a90bf)
+cn_sort库的核心思想是基数排序，思想类似这篇提到的对英文单词的排序： [Java 实现 单词排序———基数排序](https://www.jianshu.com/p/3331930a90bf) 。
 
 cn_sort库分为词组量少与词组量多的排序方式，这两种方式默认的词组量阈值为500000。
 
 cn_sort库当词组量少时，包含最基本的排序功能。基本思想如下图：
 
-【待插入图】
+<div align="center">
+  <img src="https://github.com/bmxbmx3/cn_sort/blob/master/readme_pic/%E8%AF%8D%E7%BB%84%E9%87%8F%E5%B0%91.png" width="60%"/>
+  <br>词组量少时的排序思想</br>
+  <br></br>
+</div>
 
 ①每个词用pypinyin转化为拼音二维组。
 
@@ -66,7 +70,11 @@ cn_sort库当词组量少时，包含最基本的排序功能。基本思想如�
 
 cn_sort库当词组量多时，采用多进程提高运算速度。先将词组量按cpu数-1来分段，用cpu数-1个生产者进程处理这分段后的词组量，为了提高运行速度，采用jieba分割并过滤出重复的词元，最后将这些词元放于1个消费者进程中，按词组量少时的情况排序，最后再按每个词间的'\n'定位标志，重新恢复成排序好的词组。大体构思如下：
 
-【插个图】
+<div align="center">
+  <img src="https://github.com/bmxbmx3/cn_sort/blob/master/readme_pic/%E8%AF%8D%E7%BB%84%E9%87%8F%E5%A4%9A.png" width="60%"/>
+  <br>词组量多时的排序思想</br>
+  <br></br>
+</div>
 
 最后所注意的是，pypinyin会将一个字的不同声调标注为这种形式：如“啊”字，四种声调及轻声标注为a（轻声）、a1（平声）、a2（上声）、a3（去声）、a4（入声）。
 
@@ -85,7 +93,43 @@ cn_sort库当词组量多时，采用多进程提高运算速度。先将词组�
 
 表结构如下：
 
-【待插图】
+<div align="center">
+  <img src="https://github.com/bmxbmx3/cn_sort/blob/master/readme_pic/%E8%A1%A8%E6%A8%A1%E5%9E%8B.png" width="60%"/>
+  <br>表模型</br>
+  <br></br>
+</div>
+
+各表截图：
+
+<div align="center">
+  <img src="https://github.com/bmxbmx3/cn_sort/blob/master/readme_pic/pinyin%E8%A1%A8.png" width="60%"/>
+  <br>pinyin表</br>
+  <br></br>
+</div>
+
+<div align="center">
+  <img src="https://github.com/bmxbmx3/cn_sort/blob/master/readme_pic/word_pinyin%E8%A1%A8.png" width="60%"/>
+  <br>word_pinyin表</br>
+  <br></br>
+</div>
+
+<div align="center">
+  <img src="https://github.com/bmxbmx3/cn_sort/blob/master/readme_pic/bihua%E8%A1%A8.png" width="60%"/>
+  <br>bihua表</br>
+  <br></br>
+</div>
+
+<div align="center">
+  <img src="https://github.com/bmxbmx3/cn_sort/blob/master/readme_pic/word%E8%A1%A8.png" width="60%"/>
+  <br>word表</br>
+  <br></br>
+</div>
+
+<div align="center">
+  <img src="https://github.com/bmxbmx3/cn_sort/blob/master/readme_pic/all_word%E8%A1%A8.png" width="60%"/>
+  <br>word表</br>
+  <br></br>
+</div>
 
 # 引申
 
