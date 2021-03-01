@@ -110,7 +110,7 @@ if __name__=="__main__":
 # [',wa', 'Awsl', 'awsl', '重庆', '人民', '重要']
 ```
 
-可见cn_sort库主要耗时在对all_word表（字符优先级表）的I/O传输上（get_word_dict函数预先获取all_word表以用于排序）。
+可见cn_sort库主要耗时在对all_word表（字符优先级表，csv文件）的I/O传输上（get_word_dict函数预先获取all_word表以用于排序）。
 
 # 缺陷
 
