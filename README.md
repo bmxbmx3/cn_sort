@@ -52,7 +52,7 @@ cn_sort库的核心思想是基数排序，思想类似这篇提到的对英文�
 
 cn_sort库分为词组量少与词组量多的排序方式，这两种方式默认的词组量阈值为500000。
 
-核心算法位于./build/lib/cn_sort/process_cn_word.py。
+核心算法位于./cn_sort/process_cn_word.py。
 
 ## 排序方式一
 
