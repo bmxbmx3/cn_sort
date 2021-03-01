@@ -90,7 +90,7 @@ from multiprocessing.pool import Pool
 from openpyxl import Workbook
 from time import *
 
-
+# 这里替换为生产者与消费者进程，包括中文排序
 def write_to_excel(num_split):
     index = num_split[0] #第index个进程
     num_list = num_split[1] #顺序分割后的数据量
@@ -132,6 +132,8 @@ if __name__=="__main__":
     end_time = time()
     print("耗时"+str(end_time-start_time))
 ```
+
+在这个demo基础上，cn_sort库增添了生产者与消费者进程，以及进程间的通信。
 
 ## 注意
 
