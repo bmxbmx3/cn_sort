@@ -29,7 +29,7 @@ pip install -r requirements.txt
 
 ## 入门
 
-```
+```python
 from cn_sort.process_cn_word import *
 
 text_list = ["重心", "河水", "重庆", "河流", "WTO世贸组织"]      # 待排序的中文词组列表
@@ -42,7 +42,7 @@ print(result_text_list)
 
 ## 设置输出日志级别
 
-```
+```python
 set_stdout_level("CRITICAL")        # 日志级别：DEBUG、INFO、WARN、ERROR、CRITIAL
 ```
 
@@ -82,6 +82,59 @@ cn_sort库当词组量多时，采用多进程提高运算速度。先将词组�
   <br></br>
 </div>
 
+为了便于对多进程处理中文排序的理解，我这里写了一个demo：
+
+```python
+from multiprocessing import *
+from multiprocessing.pool import Pool
+from openpyxl import Workbook
+from time import *
+
+
+def write_to_excel(num_split):
+    index = num_split[0] #第index个进程
+    num_list = num_split[1] #顺序分割后的数据量
+
+    # 写入文件
+    wb = Workbook()
+    ws = wb.create_sheet("newSheet")
+    for i in range(len(num_list)):
+        ws.cell(row=i + 1, column=1).value= num_list[i]
+    wb.save('test'+str(index)+'.xlsx')
+    print("正在生成第"+str(index+1)+"个文件")
+
+if __name__=="__main__":
+
+    # 计算程序运行时间
+    start_time = time()
+
+    # 原始数据
+    num=list(range(1, 10000000 + 1))
+
+    # 分割数据量
+    n=100
+    num_split=[]
+    quotient, remainder = divmod(len(num), n)
+    for i in range(n):
+        first_index = i * quotient
+        end_index = (i + 1) * quotient if i < n - 1 else None
+        temp = num[first_index:end_index]
+        num_split.append([i,temp])
+
+    # 多进程处理数据（耗尽cpu算力）
+    cpu_n = cpu_count() # 获取cpu数，控制进程量
+    pool = Pool(cpu_n)
+    for i in range(n):
+        pool.apply_async(func=write_to_excel,args=(num_split[i],))
+    pool.close()
+    pool.join()
+
+    end_time = time()
+    print("耗时"+str(end_time-start_time))
+```
+
+## 注意
+
 最后所注意的是，pypinyin会将一个字的不同声调标注为这种形式：如“啊”字，四种声调及轻声标注为a（轻声）、a1（平声）、a2（上声）、a3（去声）、a4（入声）。
 
 # 效果（粗略计算）
@@ -97,7 +150,7 @@ cn_sort库当词组量多时，采用多进程提高运算速度。先将词组�
 
 process_cn_word.py（含核心算法）主要函数运行时间测试如下：
 
-```
+```python
 if __name__=="__main__":
     set_stdout_level("INFO")
     print(list(sort_text_list(["awsl",",wa","重要","重庆","人民","Awsl"])))
