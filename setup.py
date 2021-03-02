@@ -8,7 +8,11 @@ from setuptools import setup, find_packages
 # setup()中package_data（重点）、packages、data_files这三个参数要着重理解。
 #
 # 终端输入命令 python setup.py sdist 打包后先别急着上传到pypi，先在本地项目中的dist文件夹（打包生成的）
-# 下查看打包后的文件 *.tar.gz，看看是否有你想要打包进的文件，再终端输入命令 twine upload dist/* 上传打包后的文件。
+# 下查看打包后的文件 *.tar.gz，看看是否有你想要打包进的文件，再终端输入命令 twine upload dist/* 上传打包后的文件
+# （如果电脑中没有twine命令，先pip install twine）。
+#
+# 上传项目到pypi后，有的python镜像源（如清华镜像源）需要等几天才能将pypi更新后的库收入到镜像仓库中，
+# 用户如果输入 pip install cn_sort --upgrade 可能不会立马获得最新的库，除非切换下载源到pypi仓库。
 #
 # python setup.py bdist_wheel 命令是打包成纯（pure）wheel文件的，适用于特定的Linux, macOS, or Windows等平台。
 #
@@ -32,7 +36,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="cn_sort",
-    version="0.6.6",
+    version="0.7.0",
     license="MIT",
     description="按拼音和笔顺快速排序大量简体中文词组（支持百万数量级）。",
     long_description=long_description,

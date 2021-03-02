@@ -351,4 +351,4 @@ def set_stdout_level(level):
 
 if __name__=="__main__":
     set_stdout_level("INFO")
-    sort_text_list(["992","3.","2.","重庆","人民","Awsl"]*1000000,freeze=True)
+    sort_text_list(["992","3.","2.","重庆","人民","Awsl"]*10000000,freeze=True)
