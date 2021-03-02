@@ -181,7 +181,7 @@ def multiprocess_split_text_list(text_split_list,freeze=False):
                    [get_filter_word_evaluation_process]       # 待运行的进程
     queue_list = [Manager().Queue(maxsize=0)] * n       # 分多个队列，解决进程间通信时数据丢失的问题
     args_list = [(text_split_list[i], queue_list[i], i + 1)
-                 for i in range(3)] + [(queue_list,)]       # 参数列表
+                 for i in range(n)] + [(queue_list,)]       # 参数列表
     # 如果用户确定不用 if __name__=="__main__" 方式运行多进程，则设置freeze=True来防止多进程切换出现错误
     if freeze:
         freeze_support()  # Windows 平台要加上这句，初始化pool，避免 RuntimeError，这是因为windows的API不包含fork()等函数。
@@ -351,4 +351,4 @@ def set_stdout_level(level):
 
 if __name__=="__main__":
     set_stdout_level("INFO")
-    print(list(sort_text_list(["992","3.","2.","重庆","人民","Awsl"])))
+    print(list(sort_text_list(["992","3.","2.","重庆","人民","Awsl"]*1000000,True)))
