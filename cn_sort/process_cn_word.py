@@ -350,5 +350,5 @@ def set_stdout_level(level):
     return status
 
 if __name__=="__main__":
-    set_stdout_level("CRITICAL")
-    print(list(sort_text_list(["重要","重庆"])))
+    set_stdout_level("INFO")
+    print(list(sort_text_list(["992","3.","2.","重庆","人民","Awsl"])))
