@@ -192,14 +192,14 @@ def multiprocess_split_text_list(text_split_list,freeze=False):
     p.close()
     p.join()
 
-    # 获得四个进程返回的结果
+    # 获得cpu数个进程返回的结果
     seged_word_list_lists = [process_result_list[i].get()[0]
-                             for i in range(n)]        # 存储三段文本分割出的词的列表
+                             for i in range(n)]        # 存储cpu数-1段文本分割出的词的列表
     max_length_list = [process_result_list[i].get()[1]
                        for i in range(n)]        # 存储文本中词的最大长度
     max_length = max(max_length_list)      # 通过比较得到文本中词的最大长度
     seged_word_iter = chain.from_iterable(
-        seged_word_list_lists)  # 将三段文本分割的词组成一个可迭代对象（因为量大）
+        seged_word_list_lists)  # 将cpu数-1段文本分割的词组成一个可迭代对象（因为量大）
     # 不重复的词的索引词典及最大分割的词的长度
     filter_word_dict = process_result_list[n].get()
 
@@ -351,4 +351,4 @@ def set_stdout_level(level):
 
 if __name__=="__main__":
     set_stdout_level("INFO")
-    print(list(sort_text_list(["992","3.","2.","重庆","人民","Awsl"]*1000000,True)))
+    sort_text_list(["992","3.","2.","重庆","人民","Awsl"]*1000000,freeze=True)
