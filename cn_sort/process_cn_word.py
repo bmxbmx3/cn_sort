@@ -356,8 +356,3 @@ def set_stdout_level(level):
             cfg.write(cfg_file)
         status = True
     return status
-
-
-if __name__ == "__main__":
-    set_stdout_level("INFO")
-    a = sort_text_list(["992", "鈤与", "((٩(//̀Д/́/)۶))", "重庆人们", "人民重庆", "Awsl"], freeze=True)

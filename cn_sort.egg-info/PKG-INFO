@@ -1,6 +1,6 @@
 Metadata-Version: 2.1
 Name: cn-sort
-Version: 0.7.1
+Version: 0.7.2
 Summary: 按拼音和笔顺快速排序大量简体中文词组（支持百万数量级）。
 Home-page: https://github.com/bmxbmx3/cn_sort/tree/master
 Author: bmxbmx3
