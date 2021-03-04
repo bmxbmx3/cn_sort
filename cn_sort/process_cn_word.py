@@ -413,5 +413,5 @@ def set_stdout_level(level):
 
 
 if __name__ == "__main__":
-    a = list(sort_text_list(["二", "重要", "三", "一二", "一", "22", "1", "a", "重庆"], mode=Mode.bihua))
+    a = list(sort_text_list(["不要","人","一"]*100000000, mode=Mode.bihua))
     print(a)
