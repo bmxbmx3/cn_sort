@@ -5,10 +5,14 @@ import re
 from itertools import *
 from multiprocessing import *
 from multiprocessing.pool import Pool
+import openpyxl
 
 import jieba
 import pypinyin
 from pypinyin import Style
+from enum import Enum
+
+import json
 
 from cn_sort.decorator import *
 import configparser
@@ -22,27 +26,63 @@ logger_all = logging.getLogger("all")  # 写入all.log
 logger_error = logging.getLogger("error")  # 写入error.log
 
 
+class Mode(Enum):
+    """
+    设置排序模式
+    """
+    pinyin = 1  # 按拼音再笔顺
+    bihua = 2  # 按笔顺
+
+
 @metric_time
-def get_word_dict():
+def get_word_dict(mode=Mode.pinyin):
     """
     获取所有字的索引表。
+    :param mode:设置排序模式：Mode.pinyin：按拼音再笔顺；Mode.bishun：按笔顺。
     :return: 所有字的索引表。
     """
     # 因为要给pypi打包成egg压缩文件，读取要用zipfile，如果不打包，用注释中的代码读取索引表
     word_dict = {}  # 用于对照的索引词典
     current_package_path = os.path.dirname(os.path.abspath(__file__))  # 获得当前包所在的绝对路径，很重要！！！识别不出来就很麻烦
-    with open("".join([current_package_path, "\\res\\all_word.csv"]), mode='r', encoding="utf-8") as csv_file:
-        csv_reader = csv.DictReader(csv_file, delimiter="\t", quotechar='$')
-        for row in csv_reader:
-            key = row["signature"]
-            value = int(row["evaluation_level"])
-            word_dict[key] = value
+    all_word_json_path = "".join([current_package_path, "\\res\\all_word.json"])
+    with open(all_word_json_path, 'r', encoding="utf-8") as f:
+        a = json.load(f)["all_word"]  # 此时a是一个字典对象
+        if mode == Mode.pinyin:
+            for x in a:
+                key = x["signature"]
+                value = x["pinyin_and_stroke_level"]
+                word_dict[key] = value
+        if mode == Mode.bihua:
+            for x in a:
+                key = x["chinese"]
+                value = x["stroke_increment_level"]
+                word_dict[key] = value
+
+    # 读取xlsx文件
+    # bk = openpyxl.load_workbook(all_word_xlsx_path)  # 打开文件
+    # sheet = bk.active  # 打开工作表也可以用sheet1=bk.get_sheet_by_name(‘Sheet1’)
+    # minrow = sheet.min_row  # 最小行
+    # maxrow = sheet.max_row  # 最大行
+    # mincol = sheet.min_column  # 最小列
+    # maxcol = sheet.max_column  # 最大列
+    #
+    # # 按行读取
+    # if mode == Mode.pinyin:
+    #     for i in range(minrow + 1, maxrow + 1):
+    #         key = sheet.cell(i, 1).value
+    #         value = sheet.cell(i, 2).value
+    #         word_dict[key] = value
+    # if mode == Mode.bihua:
+    #     for i in range(minrow + 1, maxrow + 1):
+    #         key = sheet.cell(i, 1).value
+    #         value = sheet.cell(i, 3).value
+    #         word_dict[key] = value
 
     # 打包成egg时读取csv文件的方法
     # word_dict = {}  # 用于对照的索引词典
     # with zipfile.ZipFile("cn_sort-0.5.5.tar.gz", "r") as zip:
     #     # 从打包的egg文件读取csv文件
-    #     with zip.open("cn_sort/all_word.csv", "r",) as f:
+    #     with zip.open("cn_sort/all_word1.csv", "r",) as f:
     #         text = f.read().decode(encoding="utf-8")      # 转换utf-8为了中文字符编码能够显示
     #         text_file = StringIO(text)
     #         csv_reader = csv.DictReader(text_file,delimiter="\t",quotechar='$')
@@ -54,7 +94,7 @@ def get_word_dict():
     return word_dict
 
 
-def get_evaluation_level_tuple(word, word_dict, pattern):
+def get_evaluation_level_tuple(word, word_dict, pattern, mode=Mode.pinyin):
     """
     获得对应元素的索引。
     :param word: 待转换成索引的词。
@@ -63,43 +103,56 @@ def get_evaluation_level_tuple(word, word_dict, pattern):
     :return: 转换成包含词对应索引的元组。
     """
 
-    # 对给定的字符串找寻对应的拼音
-    def errors(x):
-        return "".join(["no_chinese:", x])
-
-    pinyin_list = pypinyin.pinyin(
-        word,
-        heteronym=False,
-        style=Style.TONE3,
-        errors=errors)
-
-    # 对给定字符串中的每个字符建立相应的签名，并构建签名列表
-    cur_index = -1  # 记录遍历word的位置
-    signature_list = []  # 用于对照字典表中的索引
-    for i in pinyin_list:
-        pinyin = i[0]
-        pinyin_match_list = pattern.findall(pinyin)
-        if not pinyin_match_list:
-            # 如果匹配到中文，连接发音成新的signature
-            cur_index += 1
-            signature = "".join([word[cur_index], "_", pinyin])
-            signature_list.append(signature)
-        else:
-            # 如果匹配到非中文，直接装入signature_list
-            signature_list += pinyin_match_list[0]
-            cur_index += len(pinyin_match_list[0])
-
-    # 对给定的字符串构建索引列表
     evaluation_level_list = []  # 字符的索引列表
-    evaluation_level = 0  # 字符索引
-    for signature in signature_list:
-        try:
-            evaluation_level = word_dict[signature]
-        except KeyError:
-            # 找不到索引进行相应处理
-            logger_error.error("无法找到词语“%s”中的拼音索引为“%s”" % (word, signature))
-        finally:
-            evaluation_level_list.append(evaluation_level)
+
+    if mode == Mode.pinyin:
+        # 对给定的字符串找寻对应的拼音
+        def errors(x):
+            return "".join(["no_chinese:", x])
+
+        pinyin_list = pypinyin.pinyin(
+            word,
+            heteronym=False,
+            style=Style.TONE3,
+            errors=errors)
+
+        # 对给定字符串中的每个字符建立相应的签名，并构建签名列表
+        cur_index = -1  # 记录遍历word的位置
+        signature_list = []  # 用于对照字典表中的索引
+        for i in pinyin_list:
+            pinyin = i[0]
+            pinyin_match_list = pattern.findall(pinyin)
+            if not pinyin_match_list:
+                # 如果匹配到中文，连接发音成新的signature
+                cur_index += 1
+                signature = "".join([word[cur_index], "_", pinyin])
+                signature_list.append(signature)
+            else:
+                # 如果匹配到非中文，直接装入signature_list
+                signature_list += pinyin_match_list[0]
+                cur_index += len(pinyin_match_list[0])
+
+        # 对给定的字符串构建索引列表
+        evaluation_level = 0  # 字符索引
+        for signature in signature_list:
+            try:
+                evaluation_level = word_dict[signature]
+            except KeyError:
+                # 找不到索引进行相应处理
+                logger_error.error("无法找到词语“%s”中的拼音索引为“%s”" % (word, signature))
+            finally:
+                evaluation_level_list.append(evaluation_level)
+
+    if mode == Mode.bihua:
+        # 记得除去字符串末尾的'\n'结束符标志
+        for character in word[:-1]:
+            try:
+                evaluation_level = word_dict[character]
+            except KeyError:
+                # 找不到索引进行相应处理
+                logger_error.error("无法找到词语“%s”中的笔划索引为“%s”" % (word, signature))
+            finally:
+                evaluation_level_list.append(evaluation_level)
 
     return tuple(evaluation_level_list)
 
@@ -248,19 +301,20 @@ def hadle_seged_text_word(seged_text_word_iter, max_length, filter_word_dict):
 
 
 @metric_time
-def handle_text_word(text_list):
+def handle_text_word(text_list, mode=Mode.pinyin):
     """
     当词组列表整体数量较少时，用单进程时的词组列表的排序操作。
     :param text_list: 待排序的词组列表。
+    :param mode:设置排序模式：Mode.pinyin：按拼音再笔顺；Mode.bishun：按笔顺。
     :return: 排序好的词组的迭代对象。
     """
     evaluation_level_list = []  # 存放排序好的词的列表
     pattern = re.compile("^no_chinese:(.*?)$")  # 正则匹配英文字符串，取相应索引
-    word_dict = get_word_dict()  # 从数据库取用于对照的索引词典
+    word_dict = get_word_dict(mode)  # 从数据库取用于对照的索引词典
     max_length = len(max(text_list, key=len))  # 找到元素最大长度，用于补充0
     for word in text_list:
         evaluation_level_tuple = get_evaluation_level_tuple(
-            word, word_dict, pattern)
+            word, word_dict, pattern, mode)
         lack_length = max_length - len(word)  # 按max_length补充缺失的0
         temp_iter = chain.from_iterable(
             [evaluation_level_tuple, [0] * lack_length, (word,)])
@@ -306,12 +360,13 @@ def get_text_spit_list(text_list):
 
 
 @metric_time
-def sort_text_list(text_list, freeze=False, threshold=1000000):
+def sort_text_list(text_list, freeze=False, threshold=1000000, mode=Mode.pinyin):
     """
     排序汉字词组的列表，形如["人","人民"]，每个词的末尾不加”\n“。
     :param text_list: 汉字词组的列表。
     :param freeze:运行多进程时如果不在 if __name__=="__main__" ，该选项设置为True保护进程切换
     :param threshold:词组量少与词组量大的阈值默认1000000
+    :param mode:设置排序模式：Mode.pinyin：按拼音再笔顺；Mode.bishun：按笔顺。
     :return: 排序完的汉字词组的列表。
     """
     reslut_text_iter = []  # 存储排序后的迭代结果
@@ -320,10 +375,10 @@ def sort_text_list(text_list, freeze=False, threshold=1000000):
         return []
     text_list = ["".join([i, "\n"]) for i in text_list]  # 添加”\n“做分割标志
     # 根据词的集合的大小进行相应的多进程/单进程操作
-    if len(text_list) <= threshold:
+    if mode == Mode.bihua or (len(text_list) <= threshold and mode == Mode.pinyin):
         # 数据量小于1000000用单进程即可
-        reslut_text_iter = handle_text_word(text_list)
-    else:
+        reslut_text_iter = handle_text_word(text_list, mode)
+    if len(text_list) > threshold and mode == Mode.pinyin:
         # 数据量大于1000000用多进程
         text_split_text = get_text_spit_list(text_list)
         try:
@@ -351,8 +406,12 @@ def set_stdout_level(level):
     status = False  # 日志级别配置成功标志
     # 保证输入的级别字符串落在日志级别的范围内
     if level in ["DEBUG", "INFO", "WARN", "ERROR", "CRITICAL"]:
-        cfg.set("handler_streamHandler", "level", level)
         with open(logging_file_path, "w", encoding="utf-8") as cfg_file:
             cfg.write(cfg_file)
         status = True
     return status
+
+
+if __name__ == "__main__":
+    a = list(sort_text_list(["二", "重要", "三", "一二", "一", "22", "1", "a", "重庆"], mode=Mode.bihua))
+    print(a)

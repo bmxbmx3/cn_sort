@@ -36,7 +36,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="cn_sort",
-    version="0.7.2",
+    version="0.7.3",
     license="MIT",
     description="按拼音和笔顺快速排序大量简体中文词组（支持百万数量级）。",
     long_description=long_description,
@@ -61,8 +61,12 @@ setup(
         "Programming Language :: Python :: 3.7"
     ],
     package_data={
-        "": ["res/all_word.csv","res/logging.conf"]
+        "": ["res/all_word.json", "res/logging.conf"]
     },
-    packages=find_packages(include=["cn_sort","readme_pic"], exclude=["modify_db"]),
-    python_requires=">=3.6"
+    packages=find_packages(include=["cn_sort", "readme_pic"], exclude=["modify_db"]),
+    python_requires=">=3.6",
+    project_urls={
+        'Bug Reports': 'https://github.com/bmxbmx3/cn_sort/issues',
+        'Source': 'https://github.com/bmxbmx3',
+    },
 )
