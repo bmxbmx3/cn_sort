@@ -413,4 +413,7 @@ def set_stdout_level(level):
 
 
 if __name__ == "__main__":
-    a = list(sort_text_list(["不要","人","一"] * 100000, mode=Mode.BIHUA))
+    start_time=time()
+    a = list(sort_text_list(["中国人民","中国人民银行","中国人"] * 100000, mode=Mode.PINYIN,threshold=100000000))
+    end_time=time()
+    print(end_time-start_time)
