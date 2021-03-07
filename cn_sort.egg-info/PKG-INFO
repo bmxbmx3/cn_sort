@@ -1,6 +1,6 @@
 Metadata-Version: 2.1
 Name: cn-sort
-Version: 0.7.5
+Version: 0.7.6
 Summary: 按拼音和笔顺快速排序大量简体中文词组（支持百万数量级）。
 Home-page: https://github.com/bmxbmx3/cn_sort/tree/master
 Author: bmxbmx3
@@ -48,20 +48,20 @@ Description: ﻿# cn_sort
         from cn_sort.process_cn_word import *
         
         if __name__ == "__main__":
-            # 先按拼音，再按笔顺排序
-            text_list = ["重心", "河水", "重庆", "河流", "WTO世贸组织"]  # 待排序的中文词组列表
-            result_text_list = list(sort_text_list(text_list, mode=Mode.pinyin))  # mode=Mode.pinyin可以不写
-            print(result_text_list)
-            # 输出：
-            # ['WTO世贸组织', '重庆', '河流', '河水', '重心']
+           # 先按拼音，再按笔顺排序
+           text_list = ["重心", "河水", "重庆", "河流", "WTO世贸组织"]  # 待排序的中文词组列表
+           result_text_list = list(sort_text_list(text_list, mode=Mode.PINYIN))  # mode=Mode.pinyin可以不写
+           print(result_text_list)
+           # 输出：
+           # ['WTO世贸组织', '重庆', '河流', '河水', '重心']
         
-            # 只按笔顺排序
-            text_list = ["二", "重要", "三", "一二", "一", "22", "1", "a", "重庆"]  # 待排序的中文词组列表
-            a = list(sort_text_list(mode=Mode.bihua))
-            print(a)
+           # 只按笔顺排序
+           text_list = ["二", "重要", "三", "一二", "一", "22", "1", "a", "重庆"]  # 待排序的中文词组列表
+           a = list(sort_text_list(mode=Mode.BIHUA))
+           print(a)
         
-            # 输出：
-            # ['1', '22', 'a', '一', '一二', '二', '三', '重庆', '重要']
+           # 输出：
+           # ['1', '22', 'a', '一', '一二', '二', '三', '重庆', '重要']
         ```
         
         ## 设置输出日志级别
@@ -82,7 +82,7 @@ Description: ﻿# cn_sort
         * 模式一（默认）：对词从左往右逐字先对比拼音排序，当拼音相同时再对比笔顺的排序方式，如`["唯依","唯衣","唯一","啊"]`排序为`["啊","唯一", "唯衣", "唯依"]`。
         * 模式二：对词从左往右逐字对比笔顺排序，如`["三","二","一","一二"]`排序为`["一","一二", "二", "三"]`。
         
-        cn_sort库分为词组量少（排序方式一）与词组量多（排序方式二）的排序方式，这两种方式默认的词组量阈值为1000000。模式一分排序方式一与排序方式二，模式二只采用排序方式一。
+        cn_sort库分为词组量少（排序方式一）与词组量多（排序方式二）的排序方式，这两种方式默认的词组量阈值为100000。模式一分排序方式一与排序方式二，模式二只采用排序方式一。
         
         核心算法位于./cn_sort/process_cn_word.py。
         
@@ -148,7 +148,7 @@ Description: ﻿# cn_sort
             start_time = time()
         
             # 原始数据
-            num = list(range(1, 10000000 + 1))
+            num = list(range(1, 1000000 + 1))
         
             # 分割数据量
             n = 100
@@ -206,6 +206,8 @@ Description: ﻿# cn_sort
         如果你要更改使用排序方式一与排序方式二之间的词组量阈值，可对sort_text_list函数的threshold参数进行调整：
         
         ```python
+        from cn_sort.process_cn_word import *
+        
         if __name__ == "__main__":
             set_stdout_level("INFO")
             sort_text_list(["992", "人民", "Awsl"] * 100000, freeze=True, threshold=5000)
@@ -263,13 +265,15 @@ Description: ﻿# cn_sort
         * 处理器： Intel(R) Core(TM) i5-4200H CPU @ 2.80 GHz 2.79 GHz
         * 已安装内存：12.0 GB
         
-        当词组量<=1000000时，对于万级的词组量排序速度大概能控制在1-2秒，十万级的词组量大概能控制在5-10秒。
+        当词组量<=100000时，对于万级的词组量排序速度大概能控制在1-2秒，十万级的词组量大概能控制在5-10秒。
         
-        当词组量>1000000时，对于百万级的词组量，排序速度可控制在15-30秒。
+        当词组量>100000时，对于百万级的词组量，排序速度可控制在15-30秒。
         
         process_cn_word.py（含核心算法）主要函数运行时间测试如下：
         
         ```python
+        from cn_sort.process_cn_word import *
+        
         if __name__ == "__main__":
             set_stdout_level("INFO")
             print(list(sort_text_list(["awsl", ",wa", "重要", "重庆", "人民", "Awsl"])))
@@ -291,7 +295,7 @@ Description: ﻿# cn_sort
         
         同时我也发现，受限于排序算法的稳定性，若词组中大量出现相同或者相近的词，以及词的长度出现某几个词很长而其余的词都很短的情况，程序运行的效率会严重下降。
         
-        我所查阅的资料中，算法导论含有用最高位基数排序算法（MSD）对英文单词逐级排序的描述：[Algorithms: String Sorts](https://www.informit.com/articles/article.aspx?p=2180073)
+        我所查阅的资料中，算法导论含有用最高位基数排序算法（MSD）对英文单词逐级排序的描述：[Algorithms: String Sorts](https://www.informit.com/articles/article.aspx?p=2180073) 。
         后面我会花点时间好好研究一下MSD的原理，看能否应用到第二版cn_sort库中。
         
         # 表结构
@@ -398,7 +402,7 @@ Description: ﻿# cn_sort
         
         cn_sort库为本人（bmxbmx3）设计，若要转载readme.md中的内容或者调用本库，请注明引用或转载，侵权必究。
         
-Keywords: njupt chinese word sort pronounce bihua 排序 中文 拼音 笔画 笔顺 词 汉字
+Keywords: njupt chinese word sort pronounce BIHUA 排序 中文 拼音 笔画 笔顺 词 汉字
 Platform: UNKNOWN
 Classifier: Development Status :: 4 - Beta
 Classifier: Intended Audience :: Developers

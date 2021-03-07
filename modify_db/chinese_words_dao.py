@@ -125,7 +125,7 @@ def batch_insert(obj, data, batch_size=100):
         for row in range(4):
             temp_data=("zhidao",100)        # 待插入的记录为元组格式，且从前往后分别对应表的字段
             data.append(temp_data)      # data批量保存要插入的记录
-        batch_insert(pinyin,data)       # 批量插入
+        batch_insert(PINYIN,data)       # 批量插入
         db.close()
     :param obj: 表名
     :param data: 储存待插入的行记录。

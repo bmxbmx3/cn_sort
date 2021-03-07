@@ -30,15 +30,15 @@ class Mode(Enum):
     """
     设置排序模式
     """
-    pinyin = 1  # 按拼音再笔顺
-    bihua = 2  # 按笔顺
+    PINYIN = 1  # 按拼音再笔顺
+    BIHUA = 2  # 按笔顺
 
 
 @metric_time
-def get_word_dict(mode=Mode.pinyin):
+def get_word_dict(mode=Mode.PINYIN):
     """
     获取所有字的索引表。
-    :param mode:设置排序模式：Mode.pinyin：按拼音再笔顺；Mode.bishun：按笔顺。
+    :param mode:设置排序模式：Mode.PINYIN：按拼音再笔顺；Mode.bishun：按笔顺。
     :return: 所有字的索引表。
     """
     # 因为要给pypi打包成egg压缩文件，读取要用zipfile，如果不打包，用注释中的代码读取索引表
@@ -47,12 +47,12 @@ def get_word_dict(mode=Mode.pinyin):
     all_word_json_path = "".join([current_package_path, "\\res\\all_word.json"])
     with open(all_word_json_path, 'r', encoding="utf-8") as f:
         a = json.load(f)["all_word"]  # 此时a是一个字典对象
-        if mode == Mode.pinyin:
+        if mode == Mode.PINYIN:
             for x in a:
                 key = x["signature"]
                 value = x["pinyin_and_stroke_level"]
                 word_dict[key] = value
-        if mode == Mode.bihua:
+        if mode == Mode.BIHUA:
             for x in a:
                 key = x["chinese"]
                 value = x["stroke_increment_level"]
@@ -67,12 +67,12 @@ def get_word_dict(mode=Mode.pinyin):
     # maxcol = sheet.max_column  # 最大列
     #
     # # 按行读取
-    # if mode == Mode.pinyin:
+    # if mode == Mode.PINYIN:
     #     for i in range(minrow + 1, maxrow + 1):
     #         key = sheet.cell(i, 1).value
     #         value = sheet.cell(i, 2).value
     #         word_dict[key] = value
-    # if mode == Mode.bihua:
+    # if mode == Mode.BIHUA:
     #     for i in range(minrow + 1, maxrow + 1):
     #         key = sheet.cell(i, 1).value
     #         value = sheet.cell(i, 3).value
@@ -94,7 +94,7 @@ def get_word_dict(mode=Mode.pinyin):
     return word_dict
 
 
-def get_evaluation_level_tuple(word, word_dict, pattern, mode=Mode.pinyin):
+def get_evaluation_level_tuple(word, word_dict, pattern, mode=Mode.PINYIN):
     """
     获得对应元素的索引。
     :param word: 待转换成索引的词。
@@ -105,7 +105,7 @@ def get_evaluation_level_tuple(word, word_dict, pattern, mode=Mode.pinyin):
 
     evaluation_level_list = []  # 字符的索引列表
 
-    if mode == Mode.pinyin:
+    if mode == Mode.PINYIN:
         # 对给定的字符串找寻对应的拼音
         def errors(x):
             return "".join(["no_chinese:", x])
@@ -143,7 +143,7 @@ def get_evaluation_level_tuple(word, word_dict, pattern, mode=Mode.pinyin):
             finally:
                 evaluation_level_list.append(evaluation_level)
 
-    if mode == Mode.bihua:
+    if mode == Mode.BIHUA:
         # 记得除去字符串末尾的'\n'结束符标志
         for character in word[:-1]:
             try:
@@ -301,11 +301,11 @@ def hadle_seged_text_word(seged_text_word_iter, max_length, filter_word_dict):
 
 
 @metric_time
-def handle_text_word(text_list, mode=Mode.pinyin):
+def handle_text_word(text_list, mode=Mode.PINYIN):
     """
     当词组列表整体数量较少时，用单进程时的词组列表的排序操作。
     :param text_list: 待排序的词组列表。
-    :param mode:设置排序模式：Mode.pinyin：按拼音再笔顺；Mode.bishun：按笔顺。
+    :param mode:设置排序模式：Mode.PINYIN：按拼音再笔顺；Mode.bishun：按笔顺。
     :return: 排序好的词组的迭代对象。
     """
     evaluation_level_list = []  # 存放排序好的词的列表
@@ -360,13 +360,13 @@ def get_text_spit_list(text_list):
 
 
 @metric_time
-def sort_text_list(text_list, freeze=False, threshold=1000000, mode=Mode.pinyin):
+def sort_text_list(text_list, freeze=False, threshold=100000, mode=Mode.PINYIN):
     """
     排序汉字词组的列表，形如["人","人民"]，每个词的末尾不加”\n“。
     :param text_list: 汉字词组的列表。
     :param freeze:运行多进程时如果不在 if __name__=="__main__" ，该选项设置为True保护进程切换
     :param threshold:词组量少与词组量大的阈值默认1000000
-    :param mode:设置排序模式：Mode.pinyin：按拼音再笔顺；Mode.bishun：按笔顺。
+    :param mode:设置排序模式：Mode.PINYIN：按拼音再笔顺；Mode.bishun：按笔顺。
     :return: 排序完的汉字词组的列表。
     """
     reslut_text_iter = []  # 存储排序后的迭代结果
@@ -375,10 +375,10 @@ def sort_text_list(text_list, freeze=False, threshold=1000000, mode=Mode.pinyin)
         return []
     text_list = ["".join([i, "\n"]) for i in text_list]  # 添加”\n“做分割标志
     # 根据词的集合的大小进行相应的多进程/单进程操作
-    if mode == Mode.bihua or (len(text_list) <= threshold and mode == Mode.pinyin):
+    if mode == Mode.BIHUA or (len(text_list) <= threshold and mode == Mode.PINYIN):
         # 数据量小于1000000用单进程即可
         reslut_text_iter = handle_text_word(text_list, mode)
-    if len(text_list) > threshold and mode == Mode.pinyin:
+    if len(text_list) > threshold and mode == Mode.PINYIN:
         # 数据量大于1000000用多进程
         text_split_text = get_text_spit_list(text_list)
         try:
@@ -413,5 +413,4 @@ def set_stdout_level(level):
 
 
 if __name__ == "__main__":
-    a = list(sort_text_list(["不要","人","一"]*100000000, mode=Mode.bihua))
-    print(a)
+    a = list(sort_text_list(["不要","人","一"] * 100000, mode=Mode.BIHUA))
