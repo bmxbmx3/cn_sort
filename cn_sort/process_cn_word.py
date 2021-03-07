@@ -139,7 +139,7 @@ def get_evaluation_level_tuple(word, word_dict, pattern, mode=Mode.PINYIN):
                 evaluation_level = word_dict[signature]
             except KeyError:
                 # 找不到索引进行相应处理
-                logger_error.error("无法找到词语“%s”中的拼音索引为“%s”" % (word, signature))
+                logger_error.error("无法找到词语“%s”中的拼音索引" % (word))
             finally:
                 evaluation_level_list.append(evaluation_level)
 
@@ -150,7 +150,7 @@ def get_evaluation_level_tuple(word, word_dict, pattern, mode=Mode.PINYIN):
                 evaluation_level = word_dict[character]
             except KeyError:
                 # 找不到索引进行相应处理
-                logger_error.error("无法找到字“%s”的笔划索引" % (character))
+                logger_error.error("无法找到字“%s”的笔顺索引" % (character))
             finally:
                 evaluation_level_list.append(evaluation_level)
 
