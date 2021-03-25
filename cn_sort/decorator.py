@@ -35,7 +35,8 @@ def metric_time(func):
         result = func(*args, **kwargs)
         end_time = time()
         current_package_path = os.path.dirname(os.path.abspath(__file__))  # 获得当前包所在的绝对路径，很重要！！！识别不出来就很麻烦
-        logging.config.fileConfig("".join([current_package_path,"\\res\\logging.conf"]))
+        log_path = os.path.join(current_package_path, "res", "logging.conf")  # 日志文件路径
+        logging.config.fileConfig(log_path)
         logger_all=logging.getLogger("all")
         logger_all.info("%s函数运行时间为%fs" % (func.__name__, end_time - start_time))
         return result
