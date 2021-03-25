@@ -5,13 +5,12 @@ import re
 from itertools import *
 from multiprocessing import *
 from multiprocessing.pool import Pool
-import openpyxl
 
 import jieba
 import pypinyin
 from pypinyin import Style
 from enum import Enum
-
+import os
 import json
 
 from cn_sort.decorator import *
@@ -21,7 +20,8 @@ import configparser
 
 # 读取日志配置文件内容
 current_package_path = os.path.dirname(os.path.abspath(__file__))  # 获得当前包所在的绝对路径，很重要！！！识别不出来就很麻烦
-logging.config.fileConfig("".join([current_package_path, "\\res\\logging.conf"]))
+log_path=os.path.join(current_package_path, "res","logging.conf") # 日志文件路径
+logging.config.fileConfig(log_path)
 logger_all = logging.getLogger("all")  # 写入all.log
 logger_error = logging.getLogger("error")  # 写入error.log
 
@@ -44,7 +44,7 @@ def get_word_dict(mode=Mode.PINYIN):
     # 因为要给pypi打包成egg压缩文件，读取要用zipfile，如果不打包，用注释中的代码读取索引表
     word_dict = {}  # 用于对照的索引词典
     current_package_path = os.path.dirname(os.path.abspath(__file__))  # 获得当前包所在的绝对路径，很重要！！！识别不出来就很麻烦
-    all_word_json_path = "".join([current_package_path, "\\res\\all_word.json"])
+    all_word_json_path = os.path.join(current_package_path, "res","all_word.json") # 兼容unix系统，解决路径的反斜杠'/'问题
     with open(all_word_json_path, 'r', encoding="utf-8") as f:
         a = json.load(f)["all_word"]  # 此时a是一个字典对象
         if mode == Mode.PINYIN:
@@ -59,6 +59,7 @@ def get_word_dict(mode=Mode.PINYIN):
                 word_dict[key] = value
 
     # 读取xlsx文件
+    # 用到openpxl库
     # bk = openpyxl.load_workbook(all_word_xlsx_path)  # 打开文件
     # sheet = bk.active  # 打开工作表也可以用sheet1=bk.get_sheet_by_name(‘Sheet1’)
     # minrow = sheet.min_row  # 最小行
@@ -414,6 +415,6 @@ def set_stdout_level(level):
 
 if __name__ == "__main__":
     start_time=time()
-    a = list(sort_text_list(["中国人民","中国人民银行","中国人"] * 100000, mode=Mode.PINYIN,threshold=100000000))
+    a = list(sort_text_list(["中国人民","中国人民银行","中国人"] * 100000, mode=Mode.PINYIN,threshold=1000))
     end_time=time()
     print(end_time-start_time)

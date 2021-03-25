@@ -31,12 +31,12 @@ from setuptools import setup, find_packages
 # 是否运行如自己所愿，而是直接在本地将安装好的自己写的包进行修改，不管系统怎么提示读写权限直接改完运行，不然上传下载看效果
 # 很费时间。
 
-with open("README.md", "r", encoding="utf-8") as fh:
-    long_description = fh.read()
+with open("README.md", "r", encoding="utf-8") as f:
+    long_description = f.read()
 
 setup(
     name="cn_sort",
-    version="0.7.7",
+    version="0.7.8",
     license="MIT",
     description="按拼音和笔顺快速排序大量简体中文词组（支持百万数量级）。",
     long_description=long_description,
@@ -46,7 +46,7 @@ setup(
     url="https://github.com/bmxbmx3/cn_sort/tree/master",
     download_url="https://pypi.org/project/cn-sort/#files",
     keywords=[
-        "njupt chinese word sort pronounce BIHUA 排序 中文 拼音 笔画 笔顺 词 汉字",
+        "njupt chinese word sort pronounce bihua 排序 中文 拼音 笔画 笔顺 词 汉字",
     ],
     install_requires=[
         "pypinyin",
