@@ -37,20 +37,20 @@ pip install -r requirements.txt
 from cn_sort.process_cn_word import *
 
 if __name__ == "__main__":
-   # 先按拼音，再按笔顺排序
-   text_list = ["重心", "河水", "重庆", "河流", "WTO世贸组织"]  # 待排序的中文词组列表
-   result_text_list = list(sort_text_list(text_list, mode=Mode.PINYIN))  # mode=Mode.pinyin可以不写
-   print(result_text_list)
-   # 输出：
-   # ['WTO世贸组织', '重庆', '河流', '河水', '重心']
+    # 先按拼音，再按笔顺排序
+    text_list = ["重心", "河水", "重庆", "河流", "WTO世贸组织"]  # 待排序的中文词组列表
+    a = list(sort_text_list(text_list, mode=Mode.PINYIN))  # mode=Mode.pinyin可以不写
+    print(a)
+    # 输出：
+    # ['WTO世贸组织', '重庆', '河流', '河水', '重心']
 
-   # 只按笔顺排序
-   text_list = ["二", "重要", "三", "一二", "一", "22", "1", "a", "重庆"]  # 待排序的中文词组列表
-   a = list(sort_text_list(mode=Mode.BIHUA))
-   print(a)
+    # 只按笔顺排序
+    text_list = ["二", "重要", "三", "一二", "一", "22", "1", "a", "重庆"]  # 待排序的中文词组列表
+    a = list(sort_text_list(text_list, mode=Mode.BIHUA))
+    print(a)
 
-   # 输出：
-   # ['1', '22', 'a', '一', '一二', '二', '三', '重庆', '重要']
+    # 输出：
+    # ['1', '22', 'a', '一', '一二', '二', '三', '重庆', '重要']
 ```
 
 ## 设置输出日志级别
@@ -284,8 +284,8 @@ if __name__ == "__main__":
 
 同时我也发现，受限于排序算法的稳定性，若词组中大量出现相同或者相近的词，以及词的长度出现某几个词很长而其余的词都很短的情况，程序运行的效率会严重下降。
 
-我所查阅的资料中，算法导论含有用最高位基数排序算法（MSD）对英文单词逐级排序的描述：[Algorithms: String Sorts](https://www.informit.com/articles/article.aspx?p=2180073) 。
-后面我会花点时间好好研究一下MSD的原理，看能否应用到第二版cn_sort库中。
+我所查阅的资料中，算法导论含有用最高位基数排序算法（MSD）对英文单词逐级排序的描述：[Algorithms: String Sorts](https://www.informit.com/articles/article.aspx?p=2180073)
+。 后面我会花点时间好好研究一下MSD的原理，看能否应用到第二版cn_sort库中。
 
 此外，词组排序的速度，受限于pypinyin识别拼音时所采用的分词算法（具体参见[对拼音识别的改进建议](https://github.com/mozillazg/python-pinyin/issues/188)）：对比一百万个词组进行分词，用cn_sort库开满4个进程并发排序，jieba的处理速度约为20秒，而pypinyin内置的[中文分词算法](https://github.com/mozillazg/python-pinyin/tree/master/pypinyin/seg)约为60秒——可见小规模词组排序的上限可做进一步提升。未来会联系pypinyin库的作者[mozillazg](https://github.com/mozillazg)，看能否参与改进内置的分词算法，从而摒弃jieba库。
 
