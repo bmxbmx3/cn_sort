@@ -384,6 +384,7 @@ if __name__ == "__main__":
 * [ ] 尝试采用链式基数排序算法节省空间
 * [ ] 更新modify_db/new_chinese_words.db的数据
 * [ ] 学习jieba的分词原理，参与改进pypinyin内置的分词算法（原为FMM分词）
+* [ ] 增加单元测试
 
 ## 部署
 
