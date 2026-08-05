@@ -91,12 +91,32 @@ Set console log verbosity. `level` ∈ `{"DEBUG", "INFO", "WARN", "ERROR", "CRIT
 
 cn_sort converts each word into a tuple of integer priorities, then applies **LSD radix sort** — sorting from the last character column to the first using Python's stable timsort.
 
+### Pinyin mode
+
 ![Pinyin sort flow](readme_pic/pinyin_sort_flow.png)
 
 1. **Priority table** — 20 000+ characters pre-ranked by Pinyin + stroke order, stored in `all_word.json` for O(1) lookup.
 2. **Word → tuple** — each character maps to a signature (e.g. `人_ren2`) looked up in the table.
 3. **LSD radix sort** — `operator.itemgetter` sorts each column in place; stable sort guarantees correct ordering.
 4. **Polyphonic chars** — `pypinyin` selects the right reading from word context automatically.
+
+![Radix sort diagram](readme_pic/radix_sort_diagram.png)
+
+### Stroke-order mode
+
+![Stroke sort flow](readme_pic/stroke_sort_flow.png)
+
+Characters are ranked by stroke increment level instead of Pinyin signature.
+
+### Polyphonic character example
+
+![Polyphonic example](readme_pic/polyphonic_example.png)
+
+### Priority table schema
+
+![Word priority table](readme_pic/word_priority_table.png)
+
+### Large-scale multiprocess pipeline
 
 For lists larger than `threshold`, cn_sort spawns a producer-consumer process pool:
 
@@ -109,6 +129,8 @@ For lists larger than `threshold`, cn_sort spawns a producer-consumer process po
 ---
 
 ## Performance
+
+![Benchmark](readme_pic/benchmark_chart.png)
 
 | Scale | Mode | Time |
 |-------|------|------|

@@ -91,12 +91,32 @@ sort_text_list(big_list, threshold=100_000)
 
 cn_sort 将每个词转换为整数优先级元组，再用 **LSD 基数排序**——从最后一列到第一列逐列用 Python timsort 稳定排序。
 
+### 拼音模式
+
 ![拼音排序流程](readme_pic/pinyin_sort_flow.png)
 
 1. **优先级表** — 2 万多个汉字按拼音+笔顺预先排好优先级，存入 `all_word.json`，查询 O(1)。
 2. **词→元组** — 每个字通过拼音签名（如 `人_ren2`）查表，得到整数优先级。
 3. **LSD 基数排序** — 用 `operator.itemgetter` 逐列原地排序，稳定性保证正确顺序。
 4. **多音字** — `pypinyin` 自动根据词语上下文选择正确读音。
+
+![基数排序示意](readme_pic/radix_sort_diagram.png)
+
+### 笔顺模式
+
+![笔顺排序流程](readme_pic/stroke_sort_flow.png)
+
+按笔顺增量等级排序，不依赖拼音签名。
+
+### 多音字示例
+
+![多音字示例](readme_pic/polyphonic_example.png)
+
+### 优先级表结构
+
+![优先级表](readme_pic/word_priority_table.png)
+
+### 大规模多进程架构
 
 词组数量超过 `threshold` 时，启用多进程架构：
 
@@ -109,6 +129,8 @@ cn_sort 将每个词转换为整数优先级元组，再用 **LSD 基数排序**
 ---
 
 ## 性能
+
+![性能基准](readme_pic/benchmark_chart.png)
 
 | 规模 | 模式 | 耗时 |
 |------|------|------|
