@@ -1,6 +1,7 @@
 import json
 import logging
 import logging.config
+import operator
 import os
 import re
 from enum import Enum
@@ -22,6 +23,9 @@ logger_error = logging.getLogger("error")
 
 # Cache the word dict to avoid re-reading JSON on every call.
 _word_dict_cache: dict = {}
+
+# Pre-compiled pattern for non-Chinese character detection.
+_NO_CHINESE_PATTERN = re.compile(r"^no_chinese:(.*?)$")
 
 
 class Mode(Enum):
@@ -50,8 +54,14 @@ def get_word_dict(mode: Mode = Mode.PINYIN) -> dict:
     return word_dict
 
 
-def get_evaluation_level_tuple(word: str, word_dict: dict, pattern: re.Pattern,
+def get_evaluation_level_tuple(word: str, word_dict: dict,
                                mode: Mode = Mode.PINYIN) -> tuple:
+    """Convert a word into a priority-integer tuple for sorting.
+
+    Fix: evaluation_level is now reset to 0 inside each loop iteration
+    (PINYIN branch) so a KeyError never silently carries over the previous
+    character's value.
+    """
     evaluation_level_list = []
 
     if mode == Mode.PINYIN:
@@ -64,7 +74,7 @@ def get_evaluation_level_tuple(word: str, word_dict: dict, pattern: re.Pattern,
         signature_list = []
         for item in pinyin_list:
             pinyin = item[0]
-            pinyin_matches = pattern.findall(pinyin)
+            pinyin_matches = _NO_CHINESE_PATTERN.findall(pinyin)
             if not pinyin_matches:
                 cur_index += 1
                 signature_list.append(word[cur_index] + "_" + pinyin)
@@ -72,14 +82,14 @@ def get_evaluation_level_tuple(word: str, word_dict: dict, pattern: re.Pattern,
                 signature_list += list(pinyin_matches[0])
                 cur_index += len(pinyin_matches[0])
 
-        evaluation_level = 0
         for signature in signature_list:
+            # Reset per-character so a KeyError never bleeds into the next char.
+            evaluation_level = 0
             try:
                 evaluation_level = word_dict[signature]
             except KeyError:
                 logger_error.error("KEYERR_PINYIN: %s", word)
-            finally:
-                evaluation_level_list.append(evaluation_level)
+            evaluation_level_list.append(evaluation_level)
 
     else:
         for character in word[:-1]:
@@ -88,8 +98,7 @@ def get_evaluation_level_tuple(word: str, word_dict: dict, pattern: re.Pattern,
                 evaluation_level = word_dict[character]
             except KeyError:
                 logger_error.error("KEYERR_BIHUA: %s", character)
-            finally:
-                evaluation_level_list.append(evaluation_level)
+            evaluation_level_list.append(evaluation_level)
 
     return tuple(evaluation_level_list)
 
@@ -124,7 +133,6 @@ def get_filter_word_evaluation_process(queue_list: list) -> dict:
     word_dict = get_word_dict()
     queue_count = len(queue_list)
     word_list = [""] * queue_count
-    pattern = re.compile(r"^no_chinese:(.*?)$")
 
     while True:
         if word_list.count(None) == queue_count:
@@ -135,7 +143,7 @@ def get_filter_word_evaluation_process(queue_list: list) -> dict:
                 word = queue_list[idx].get()
                 word_list[idx] = word
                 if word is not None and word != "\n" and word not in filter_word_dict:
-                    filter_word_dict[word] = get_evaluation_level_tuple(word, word_dict, pattern)
+                    filter_word_dict[word] = get_evaluation_level_tuple(word, word_dict)
 
     return filter_word_dict
 
@@ -147,9 +155,6 @@ def multiprocess_split_text_list(text_split_list: list, freeze: bool = False):
         freeze_support()
 
     with Manager() as manager:
-        # Each producer gets its own independent Queue.
-        # Bug fix: original code used [Manager().Queue()] * n which creates n aliases
-        # of the same Queue object, causing all producers to share one queue.
         queue_list = [manager.Queue(maxsize=0) for _ in range(n)]
 
         process_fns = [handle_text_process] * n + [get_filter_word_evaluation_process]
@@ -202,12 +207,11 @@ def hadle_seged_text_word(seged_text_word_iter, max_length: int, filter_word_dic
 @metric_time
 def handle_text_word(text_list: list, mode: Mode = Mode.PINYIN):
     evaluation_level_list = []
-    pattern = re.compile(r"^no_chinese:(.*?)$")
     word_dict = get_word_dict(mode)
     max_length = len(max(text_list, key=len))
 
     for word in text_list:
-        level_tuple = get_evaluation_level_tuple(word, word_dict, pattern, mode)
+        level_tuple = get_evaluation_level_tuple(word, word_dict, mode)
         lack_length = max_length - len(word)
         combined = tuple(chain(level_tuple, [0] * lack_length, (word,)))
         evaluation_level_list.append(combined)
@@ -219,11 +223,16 @@ def handle_text_word(text_list: list, mode: Mode = Mode.PINYIN):
 
 @metric_time
 def radix_sort(data: list) -> None:
+    """LSD radix sort using Python timsort on each column.
+
+    Uses operator.itemgetter instead of a lambda to avoid repeated
+    function-object creation per sort call.
+    """
     if not data:
         return
     num_columns = len(data[0])
     for col in range(num_columns - 2, -1, -1):
-        data.sort(key=lambda x: x[col])
+        data.sort(key=operator.itemgetter(col))
 
 
 @metric_time
@@ -233,7 +242,7 @@ def get_text_spit_list(text_list: list) -> list:
         logger_error.error("CPU count %d too low for multiprocess", n + 1)
         return None
 
-    quotient, remainder = divmod(len(text_list), n)
+    quotient, _ = divmod(len(text_list), n)
     text_split_list = []
     for i in range(n):
         first_index = i * quotient
@@ -245,6 +254,17 @@ def get_text_spit_list(text_list: list) -> list:
 @metric_time
 def sort_text_list(text_list: list, freeze: bool = False,
                    threshold: int = 100000, mode: Mode = Mode.PINYIN):
+    """Sort a list of Chinese words by pinyin or stroke order.
+
+    Args:
+        text_list: List of words to sort, e.g. ["人", "人民"].
+        freeze: Set True when not running under if __name__ == '__main__' on Windows.
+        threshold: Word count above which multiprocess mode activates (default 100000).
+        mode: Mode.PINYIN for pinyin+stroke; Mode.BIHUA for stroke only.
+
+    Returns:
+        Sorted list of words.
+    """
     if not text_list:
         return []
 
