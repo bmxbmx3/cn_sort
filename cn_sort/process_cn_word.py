@@ -1,418 +1,294 @@
+import json
+import logging
 import logging.config
 import os
 import re
-from itertools import *
-from multiprocessing import *
-from multiprocessing.pool import Pool
+from enum import Enum
+from itertools import chain
+from multiprocessing import Manager, Pool, cpu_count
+from multiprocessing import freeze_support
 
 import jieba
 import pypinyin
 from pypinyin import Style
-from enum import Enum
-import json
 
-from cn_sort.decorator import *
-import configparser
+from cn_sort.decorator import metric_time
 
-# 这个模块主要存放对词组列表的一些操作。
+current_package_path = os.path.dirname(os.path.abspath(__file__))
+_log_path = os.path.join(current_package_path, "res", "logging.conf")
+logging.config.fileConfig(_log_path)
+logger_all = logging.getLogger("all")
+logger_error = logging.getLogger("error")
 
-# 读取日志配置文件内容
-current_package_path = os.path.dirname(os.path.abspath(__file__))  # 获得当前包所在的绝对路径，很重要！！！识别不出来就很麻烦
-log_path=os.path.join(current_package_path, "res","logging.conf") # 日志文件路径
-logging.config.fileConfig(log_path)
-logger_all = logging.getLogger("all")  # 写入all.log
-logger_error = logging.getLogger("error")  # 写入error.log
+# Cache the word dict to avoid re-reading JSON on every call.
+_word_dict_cache: dict = {}
 
 
 class Mode(Enum):
-    """
-    设置排序模式
-    """
-    PINYIN = 1  # 按拼音再笔顺
-    BIHUA = 2  # 按笔顺
+    PINYIN = 1  # sort by pinyin then stroke order
+    BIHUA = 2   # sort by stroke order only
 
 
 @metric_time
-def get_word_dict(mode=Mode.PINYIN):
-    """
-    获取所有字的索引表。
-    :param mode:设置排序模式：Mode.PINYIN：按拼音再笔顺；Mode.bishun：按笔顺。
-    :return: 所有字的索引表。
-    """
-    # 因为要给pypi打包成egg压缩文件，读取要用zipfile，如果不打包，用注释中的代码读取索引表
-    word_dict = {}  # 用于对照的索引词典
-    current_package_path = os.path.dirname(os.path.abspath(__file__))  # 获得当前包所在的绝对路径，很重要！！！识别不出来就很麻烦
-    all_word_json_path = os.path.join(current_package_path, "res","all_word.json") # 兼容unix系统，解决路径的反斜杠'/'问题
-    with open(all_word_json_path, 'r', encoding="utf-8") as f:
-        a = json.load(f)["all_word"]  # 此时a是一个字典对象
+def get_word_dict(mode: Mode = Mode.PINYIN) -> dict:
+    cache_key = mode.value
+    if cache_key in _word_dict_cache:
+        return _word_dict_cache[cache_key]
+
+    word_dict: dict = {}
+    all_word_json_path = os.path.join(current_package_path, "res", "all_word.json")
+    with open(all_word_json_path, "r", encoding="utf-8") as f:
+        entries = json.load(f)["all_word"]
         if mode == Mode.PINYIN:
-            for x in a:
-                key = x["signature"]
-                value = x["pinyin_and_stroke_level"]
-                word_dict[key] = value
-        if mode == Mode.BIHUA:
-            for x in a:
-                key = x["chinese"]
-                value = x["stroke_increment_level"]
-                word_dict[key] = value
+            for entry in entries:
+                word_dict[entry["signature"]] = entry["pinyin_and_stroke_level"]
+        else:
+            for entry in entries:
+                word_dict[entry["chinese"]] = entry["stroke_increment_level"]
 
-    # 读取xlsx文件
-    # 用到openpxl库
-    # bk = openpyxl.load_workbook(all_word_xlsx_path)  # 打开文件
-    # sheet = bk.active  # 打开工作表也可以用sheet1=bk.get_sheet_by_name(‘Sheet1’)
-    # minrow = sheet.min_row  # 最小行
-    # maxrow = sheet.max_row  # 最大行
-    # mincol = sheet.min_column  # 最小列
-    # maxcol = sheet.max_column  # 最大列
-    #
-    # # 按行读取
-    # if mode == Mode.PINYIN:
-    #     for i in range(minrow + 1, maxrow + 1):
-    #         key = sheet.cell(i, 1).value
-    #         value = sheet.cell(i, 2).value
-    #         word_dict[key] = value
-    # if mode == Mode.BIHUA:
-    #     for i in range(minrow + 1, maxrow + 1):
-    #         key = sheet.cell(i, 1).value
-    #         value = sheet.cell(i, 3).value
-    #         word_dict[key] = value
-
-    # 打包成egg时读取csv文件的方法
-    # word_dict = {}  # 用于对照的索引词典
-    # with zipfile.ZipFile("cn_sort-0.5.5.tar.gz", "r") as zip:
-    #     # 从打包的egg文件读取csv文件
-    #     with zip.open("cn_sort/all_word1.csv", "r",) as f:
-    #         text = f.read().decode(encoding="utf-8")      # 转换utf-8为了中文字符编码能够显示
-    #         text_file = StringIO(text)
-    #         csv_reader = csv.DictReader(text_file,delimiter="\t",quotechar='$')
-    #         for row in csv_reader:
-    #             key=row["signature"]
-    #             value=int(row["evaluation_level"])
-    #             word_dict[key]=value
-
+    _word_dict_cache[cache_key] = word_dict
     return word_dict
 
 
-def get_evaluation_level_tuple(word, word_dict, pattern, mode=Mode.PINYIN):
-    """
-    获得对应元素的索引。
-    :param word: 待转换成索引的词。
-    :param word_dict: 从chinese_words.db取出的词典。
-    :param pattern: 用于提取非中文字符中的正则预编译器，默认正则表达式是“^no_chinese:(.*?)$”。
-    :return: 转换成包含词对应索引的元组。
-    """
-
-    evaluation_level_list = []  # 字符的索引列表
+def get_evaluation_level_tuple(word: str, word_dict: dict, pattern: re.Pattern,
+                               mode: Mode = Mode.PINYIN) -> tuple:
+    evaluation_level_list = []
 
     if mode == Mode.PINYIN:
-        # 对给定的字符串找寻对应的拼音
-        def errors(x):
-            return "".join(["no_chinese:", x])
+        def errors(x: str) -> str:
+            return "no_chinese:" + x
 
-        pinyin_list = pypinyin.pinyin(
-            word,
-            heteronym=False,
-            style=Style.TONE3,
-            errors=errors)
+        pinyin_list = pypinyin.pinyin(word, heteronym=False, style=Style.TONE3, errors=errors)
 
-        # 对给定字符串中的每个字符建立相应的签名，并构建签名列表
-        cur_index = -1  # 记录遍历word的位置
-        signature_list = []  # 用于对照字典表中的索引
-        for i in pinyin_list:
-            pinyin = i[0]
-            pinyin_match_list = pattern.findall(pinyin)
-            if not pinyin_match_list:
-                # 如果匹配到中文，连接发音成新的signature
+        cur_index = -1
+        signature_list = []
+        for item in pinyin_list:
+            pinyin = item[0]
+            pinyin_matches = pattern.findall(pinyin)
+            if not pinyin_matches:
                 cur_index += 1
-                signature = "".join([word[cur_index], "_", pinyin])
-                signature_list.append(signature)
+                signature_list.append(word[cur_index] + "_" + pinyin)
             else:
-                # 如果匹配到非中文，直接装入signature_list
-                signature_list += pinyin_match_list[0]
-                cur_index += len(pinyin_match_list[0])
+                signature_list += list(pinyin_matches[0])
+                cur_index += len(pinyin_matches[0])
 
-        # 对给定的字符串构建索引列表
-        evaluation_level = 0  # 字符索引
+        evaluation_level = 0
         for signature in signature_list:
             try:
                 evaluation_level = word_dict[signature]
             except KeyError:
-                # 找不到索引进行相应处理
-                logger_error.error("无法找到词语“%s”中的拼音索引" % (word))
+                logger_error.error("KEYERR_PINYIN: %s", word)
             finally:
                 evaluation_level_list.append(evaluation_level)
 
-    if mode == Mode.BIHUA:
-        # 记得除去字符串末尾的'\n'结束符标志
+    else:
         for character in word[:-1]:
+            evaluation_level = 0
             try:
                 evaluation_level = word_dict[character]
             except KeyError:
-                # 找不到索引进行相应处理
-                logger_error.error("无法找到字“%s”的笔顺索引" % (character))
+                logger_error.error("KEYERR_BIHUA: %s", character)
             finally:
                 evaluation_level_list.append(evaluation_level)
 
     return tuple(evaluation_level_list)
 
 
-def handle_text_process(text, queue, process_id):
-    """
-    生产者进程：处理文本。
-    :param text: 待分词的文本。
-    :param queue: 进程间通信的队列。
-    :param process_id: 进程id。
-    :return: 文本分割后所有词的列表，所有词的最大长度。
-    """
-    max_length = 0  # 被分割的词的最大长度
-    temp_length = 0  # 逐个计算“\n”前的词的长度
-    temp_text_list = []  # 暂时存储一个词
-    jieba.setLogLevel(20)  # 抑制jieba日志消息
+def handle_text_process(text: str, queue, process_id: int):
+    max_length = 0
+    temp_text_list = []
+    jieba.setLogLevel(20)
     seged_word_list = list(jieba.cut(text))
 
-    # 将分割后的词放入队列中
-    word_set = set()  # 存储不重复的词的集合，用于过滤
+    word_set: set = set()
     for word in seged_word_list:
-        if word is not "\n":
-            temp_text_list.extend(word)
+        if word != "\n":
+            temp_text_list.append(word)
         else:
-            # 遇到“\n”结束标志，最后一并统计词的长度
-            temp_length = len("".join(temp_text_list))
-            max_length = temp_length if temp_length > max_length else max_length
+            current_length = len("".join(temp_text_list))
+            if current_length > max_length:
+                max_length = current_length
             temp_text_list.clear()
-        # 过滤分割后的不重复的词，防止进程间队列的通信阻塞
+
         if word not in word_set:
             word_set.add(word)
             queue.put(word)
 
-    queue.put(None)  # 进程完成结束标志，向队列添加
-    logger_all.info("分词进程%d已切割%d个不重复的词" % (process_id, len(word_set)))
-
+    queue.put(None)
+    logger_all.info("producer %d: %d unique words", process_id, len(word_set))
     return seged_word_list, max_length
 
 
-def get_filter_word_evaluation_process(queue_list):
-    """
-    消费者进程：获取一个集合中所有词对应在词典中的索引。
-    :param queue_list: 装有队列的列表。
-    :return:文本经分割后的不重复的词按词典查询所得的索引表。
-    """
-    # multiprocessing不同类型的多线程使用队列的区别：
-    # pool.Pool() 共享变量使用队列时一定用multiprocessing.Manager().Queue()。
-    # Process()用multiprocessing.Queue()。
+def get_filter_word_evaluation_process(queue_list: list) -> dict:
+    filter_word_dict: dict = {}
+    word_dict = get_word_dict()
+    queue_count = len(queue_list)
+    word_list = [""] * queue_count
+    pattern = re.compile(r"^no_chinese:(.*?)$")
 
-    filter_word_dict = {}  # 过滤后不重复的词映射表组成的索引词典
-    word_dict = get_word_dict()  # 从数据库获得所有词的索引词典
-    queue_count = len(queue_list)  # 队列数量
-    word_list = [""] * queue_count  # 装从队列取出的词
-    pattern = re.compile("^no_chinese:(.*?)$")  # 正则匹配英文字符串，取相应索引
-
-    # 从队列中取元素
     while True:
-        # 多个队列停止接收
         if word_list.count(None) == queue_count:
-            logger_all.info("分词总结果为%d个不重复的词" % (len(filter_word_dict),))
+            logger_all.info("consumer: %d unique words total", len(filter_word_dict))
             break
-        for i in range(queue_count):
-            if word_list[i] is not None:
-                word = queue_list[i].get()
-                word_list[i] = word
-                # 如果从队列收集到的词不在索引词典中，则加入该词典
-                if word is not None and word is not "\n" and word not in filter_word_dict.keys():
-                    filter_word_dict[word] = get_evaluation_level_tuple(
-                        word, word_dict, pattern)
+        for idx in range(queue_count):
+            if word_list[idx] is not None:
+                word = queue_list[idx].get()
+                word_list[idx] = word
+                if word is not None and word != "\n" and word not in filter_word_dict:
+                    filter_word_dict[word] = get_evaluation_level_tuple(word, word_dict, pattern)
 
     return filter_word_dict
 
 
-# 多进程处理文本，text_list每个元素必须以"\n"结尾
 @metric_time
-def multiprocess_split_text_list(text_split_list, freeze=False):
-    """
-    多个生产者、一个消费者的多进程分割文本。
-    :param text_split_list: 待处理分段的文本组成的列表。
-    :return: 分割后的所有词的迭代对象，过滤后用于映射的词组的索引词典，所有词的最大长度。
-    """
-    n = len(text_split_list)  # 确定生产者的进程数
-    process_result_list = []  # 收集进程运行的结果
-    process_list = [handle_text_process] * n + \
-                   [get_filter_word_evaluation_process]  # 待运行的进程
-    queue_list = [Manager().Queue(maxsize=0)] * n  # 分多个队列，解决进程间通信时数据丢失的问题
-    args_list = [(text_split_list[i], queue_list[i], i + 1)
-                 for i in range(n)] + [(queue_list,)]  # 参数列表
-    # 如果用户确定不用 if __name__=="__main__" 方式运行多进程，则设置freeze=True来防止多进程切换出现错误
+def multiprocess_split_text_list(text_split_list: list, freeze: bool = False):
+    n = len(text_split_list)
     if freeze:
-        freeze_support()  # Windows 平台要加上这句，初始化pool，避免 RuntimeError，这是因为windows的API不包含fork()等函数。
-    p = Pool(n + 1)  # 充分利用所有cpu
-    for i in range(n + 1):
-        a = p.apply_async(func=process_list[i], args=args_list[i])
-        process_result_list.append(a)
-    p.close()
-    p.join()
+        freeze_support()
 
-    # 获得cpu数个进程返回的结果
-    seged_word_list_lists = [process_result_list[i].get()[0]
-                             for i in range(n)]  # 存储cpu数-1段文本分割出的词的列表
-    max_length_list = [process_result_list[i].get()[1]
-                       for i in range(n)]  # 存储文本中词的最大长度
-    max_length = max(max_length_list)  # 通过比较得到文本中词的最大长度
-    seged_word_iter = chain.from_iterable(
-        seged_word_list_lists)  # 将cpu数-1段文本分割的词组成一个可迭代对象（因为量大）
-    # 不重复的词的索引词典及最大分割的词的长度
-    filter_word_dict = process_result_list[n].get()
+    with Manager() as manager:
+        # Each producer gets its own independent Queue.
+        # Bug fix: original code used [Manager().Queue()] * n which creates n aliases
+        # of the same Queue object, causing all producers to share one queue.
+        queue_list = [manager.Queue(maxsize=0) for _ in range(n)]
+
+        process_fns = [handle_text_process] * n + [get_filter_word_evaluation_process]
+        args_list = (
+            [(text_split_list[i], queue_list[i], i + 1) for i in range(n)]
+            + [(queue_list,)]
+        )
+
+        with Pool(n + 1) as pool:
+            async_results = [
+                pool.apply_async(func=process_fns[i], args=args_list[i])
+                for i in range(n + 1)
+            ]
+            pool.close()
+            pool.join()
+
+        seged_word_list_lists = [async_results[i].get()[0] for i in range(n)]
+        max_length_list = [async_results[i].get()[1] for i in range(n)]
+        max_length = max(max_length_list)
+        seged_word_iter = chain.from_iterable(seged_word_list_lists)
+        filter_word_dict = async_results[n].get()
 
     return seged_word_iter, filter_word_dict, max_length
 
 
 @metric_time
-def hadle_seged_text_word(seged_text_word_iter, max_length, filter_word_dict):
-    """
-    当词组列表数量庞大时，用多进程将词组列表组成的文本分割后的所有词（有很多重复的）映射为对应索引。
-    :param seged_text_word_iter: 分割后的所有词的迭代对象。
-    :param max_length: 所有词的最大长度。
-    :param filter_word_dict: 过滤后用于映射的词组的索引词典。
-    :return: 排序好的词组的迭代对象。
-    """
-    evaluation_level_temp_list = []  # 暂时装入一个词对应的索引，并按maxlength补0
-    text_word_temp_list = []  # 暂时装入一个词的各部分，便于后续连接
-    # evaluation_level_list存储元素的形式为”(词的整体评级结果,词)“，如“(1,2,"你好")”
+def hadle_seged_text_word(seged_text_word_iter, max_length: int, filter_word_dict: dict):
+    evaluation_level_temp_list = []
+    text_word_temp_list = []
     evaluation_level_list = []
 
-    # 将文本分割后的词按过滤后不重复的词组成的索引词典，映射为对应索引
     for word in seged_text_word_iter:
-        if word is "\n":
-            text_word_temp = "".join(text_word_temp_list)  # 连接词的各部分分割的词
-            lack_lengh = max_length - \
-                         len(text_word_temp)  # 在词的索引后补0的个数，用于排序
-            evaluation_level_temp_list.extend([0] * lack_lengh)  # 补0
+        if word == "\n":
+            text_word_temp = "".join(text_word_temp_list)
+            lack_length = max_length - len(text_word_temp)
+            evaluation_level_temp_list.extend([0] * lack_length)
             evaluation_level_temp_list.append(text_word_temp)
             evaluation_level_list.append(tuple(evaluation_level_temp_list))
             text_word_temp_list.clear()
             evaluation_level_temp_list.clear()
         else:
             text_word_temp_list.append(word)
-            evaluation_level = filter_word_dict[word]
-            evaluation_level_temp_list.extend(evaluation_level)
+            evaluation_level_temp_list.extend(filter_word_dict[word])
 
-    radix_sort(evaluation_level_list)  # 排序
-    for i in evaluation_level_list:
-        yield i[-1].strip("\n")  # 生成器返回迭代对象结果
+    radix_sort(evaluation_level_list)
+    for item in evaluation_level_list:
+        yield item[-1].strip("\n")
 
 
 @metric_time
-def handle_text_word(text_list, mode=Mode.PINYIN):
-    """
-    当词组列表整体数量较少时，用单进程时的词组列表的排序操作。
-    :param text_list: 待排序的词组列表。
-    :param mode:设置排序模式：Mode.PINYIN：按拼音再笔顺；Mode.bishun：按笔顺。
-    :return: 排序好的词组的迭代对象。
-    """
-    evaluation_level_list = []  # 存放排序好的词的列表
-    pattern = re.compile("^no_chinese:(.*?)$")  # 正则匹配英文字符串，取相应索引
-    word_dict = get_word_dict(mode)  # 从数据库取用于对照的索引词典
-    max_length = len(max(text_list, key=len))  # 找到元素最大长度，用于补充0
+def handle_text_word(text_list: list, mode: Mode = Mode.PINYIN):
+    evaluation_level_list = []
+    pattern = re.compile(r"^no_chinese:(.*?)$")
+    word_dict = get_word_dict(mode)
+    max_length = len(max(text_list, key=len))
+
     for word in text_list:
-        evaluation_level_tuple = get_evaluation_level_tuple(
-            word, word_dict, pattern, mode)
-        lack_length = max_length - len(word)  # 按max_length补充缺失的0
-        temp_iter = chain.from_iterable(
-            [evaluation_level_tuple, [0] * lack_length, (word,)])
-        evaluation_level_list.append(tuple(temp_iter))
-    radix_sort(evaluation_level_list)  # 排序
-    for i in evaluation_level_list:
-        yield i[-1].strip("\n")  # 生成器返回迭代对象结果
+        level_tuple = get_evaluation_level_tuple(word, word_dict, pattern, mode)
+        lack_length = max_length - len(word)
+        combined = tuple(chain(level_tuple, [0] * lack_length, (word,)))
+        evaluation_level_list.append(combined)
+
+    radix_sort(evaluation_level_list)
+    for item in evaluation_level_list:
+        yield item[-1].strip("\n")
 
 
 @metric_time
-def radix_sort(data):
-    """
-    对索引列表的每个元素纵向采用python原生的timsort算法，横向采用基数排序的思想进行排序。
-    :param data: 待排序的词组列表。
-    :return: 排序好的词组列表。
-    """
-    length = len(data[0])
-    # 基数排序思想，signature放在末尾，也为了方便tuple排序
-    for i in range(length - 2, -1, -1):
-        data.sort(key=lambda x: x[i])
+def radix_sort(data: list) -> None:
+    if not data:
+        return
+    num_columns = len(data[0])
+    for col in range(num_columns - 2, -1, -1):
+        data.sort(key=lambda x: x[col])
 
 
 @metric_time
-def get_text_spit_list(text_list):
-    """
-    将词组列表进行分段。
-    :param text_list: 待分段的词组列表。
-    :return: 分段后的词组列表。
-    """
-    temp = ""
-    text_split_list = []
-    n = cpu_count() - 1  # 由cpu数决定文本分段的个数
+def get_text_spit_list(text_list: list) -> list:
+    n = cpu_count() - 1
+    if n <= 1:
+        logger_error.error("CPU count %d too low for multiprocess", n + 1)
+        return None
+
     quotient, remainder = divmod(len(text_list), n)
-    if n <= 2:
-        logger_error.error("机器的cpu数为%d，无法处理大量文本的数据" % (n + 1,))
-        text_split_list = None
+    text_split_list = []
     for i in range(n):
         first_index = i * quotient
         end_index = (i + 1) * quotient if i < n - 1 else None
-        temp = "".join(text_list[first_index:end_index])
-        text_split_list.append(temp)
+        text_split_list.append("".join(text_list[first_index:end_index]))
     return text_split_list
 
 
 @metric_time
-def sort_text_list(text_list, freeze=False, threshold=100000, mode=Mode.PINYIN):
-    """
-    排序汉字词组的列表，形如["人","人民"]，每个词的末尾不加”\n“。
-    :param text_list: 汉字词组的列表。
-    :param freeze:运行多进程时如果不在 if __name__=="__main__" ，该选项设置为True保护进程切换
-    :param threshold:词组量少与词组量大的阈值默认1000000
-    :param mode:设置排序模式：Mode.PINYIN：按拼音再笔顺；Mode.bishun：按笔顺。
-    :return: 排序完的汉字词组的列表。
-    """
-    reslut_text_iter = []  # 存储排序后的迭代结果
-    # 如果列表为空返回空列表
-    if text_list == []:
+def sort_text_list(text_list: list, freeze: bool = False,
+                   threshold: int = 100000, mode: Mode = Mode.PINYIN):
+    if not text_list:
         return []
-    text_list = ["".join([i, "\n"]) for i in text_list]  # 添加”\n“做分割标志
-    # 根据词的集合的大小进行相应的多进程/单进程操作
-    if mode == Mode.BIHUA or (len(text_list) <= threshold and mode == Mode.PINYIN):
-        # 数据量小于1000000用单进程即可
-        reslut_text_iter = handle_text_word(text_list, mode)
-    if len(text_list) > threshold and mode == Mode.PINYIN:
-        # 数据量大于1000000用多进程
-        text_split_text = get_text_spit_list(text_list)
-        try:
-            seged_text_word_iter, filter_word_dict, max_length = multiprocess_split_text_list(
-                text_split_text, freeze=freeze)
-        except RuntimeError:
-            logger_error.error("进程切换频繁出现错误，请设置sort_text_list函数的freeze参数为True，或者多进程任务在 if __name__==\"__main__\" 水平下执行")
-        else:
-            reslut_text_iter = hadle_seged_text_word(
-                seged_text_word_iter, max_length, filter_word_dict)
 
-    return reslut_text_iter
+    text_list_with_sentinel = [word + "\n" for word in text_list]
+    use_multiprocess = (len(text_list_with_sentinel) > threshold and mode == Mode.PINYIN)
+
+    if not use_multiprocess:
+        return list(handle_text_word(text_list_with_sentinel, mode))
+
+    text_split_list = get_text_spit_list(text_list_with_sentinel)
+    if text_split_list is None:
+        logger_error.error("CPU count too low, falling back to single-process")
+        return list(handle_text_word(text_list_with_sentinel, mode))
+
+    try:
+        seged_word_iter, filter_word_dict, max_length = multiprocess_split_text_list(
+            text_split_list, freeze=freeze
+        )
+    except RuntimeError:
+        logger_error.error("Multiprocess RuntimeError, falling back to single-process")
+        return list(handle_text_word(text_list_with_sentinel, mode))
+
+    return list(hadle_seged_text_word(seged_word_iter, max_length, filter_word_dict))
 
 
-def set_stdout_level(level):
-    """
-    设置终端输出日志信息的级别。
-    :param level: 日志信息的级别，如“DEBUG”等。
-    :return: 操作成功与否的布尔标志。
-    """
-    current_package_path = os.path.dirname(os.path.abspath(__file__))  # 获得当前包所在的绝对路径，很重要！！！识别不出来就很麻烦
-    logging_file_path = "".join([current_package_path, "\\res\\logging.conf"])  # 日志配置文件路径
+def set_stdout_level(level: str) -> bool:
+    import configparser
+    valid_levels = {"DEBUG", "INFO", "WARN", "ERROR", "CRITICAL"}
+    if level not in valid_levels:
+        return False
+    logging_file_path = os.path.join(current_package_path, "res", "logging.conf")
     cfg = configparser.ConfigParser()
-    cfg.read(logging_file_path)
-    status = False  # 日志级别配置成功标志
-    # 保证输入的级别字符串落在日志级别的范围内
-    if level in ["DEBUG", "INFO", "WARN", "ERROR", "CRITICAL"]:
-        with open(logging_file_path, "w", encoding="utf-8") as cfg_file:
-            cfg.write(cfg_file)
-        status = True
-    return status
+    cfg.read(logging_file_path, encoding="utf-8")
+    with open(logging_file_path, "w", encoding="utf-8") as f:
+        cfg.write(f)
+    return True
 
 
 if __name__ == "__main__":
-    start_time=time()
-    a = list(sort_text_list(["中国人民","中国人民银行","中国人"] * 100000, mode=Mode.PINYIN,threshold=1000))
-    end_time=time()
-    print(end_time-start_time)
+    from time import time
+    start_time = time()
+    result = list(sort_text_list(
+        ["中国人民", "中国人民銀行", "中国人"] * 100000,
+        mode=Mode.PINYIN,
+        threshold=1000,
+    ))
+    print(f"time: {time() - start_time:.2f}s, count: {len(result)}")
