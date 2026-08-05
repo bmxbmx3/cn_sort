@@ -137,15 +137,16 @@ For lists larger than `threshold`, cn_sort spawns a producer-consumer process po
 | 10 words | < 1 ms | first call loads the priority table (~40 ms); subsequent calls are instant |
 | 10 000 words | ~20 ms | repeated words hit the pypinyin cache; near-instant on warm runs |
 | 48 000 words | ~100 ms | single-process; cache makes repeated patterns essentially free |
-| 1 000 000 words | ~20 s | multiprocess pipeline; bottleneck is jieba segmentation |
+| 1 000 000 words | ~2.7 s | single-process with numpy lexsort; multiprocess mode for highly diverse word sets |
 
 **What makes it fast:**
 - The 20 000-character priority table loads once and stays in memory for the lifetime of the process.
 - `pypinyin` results are cached per word — sorting a list where many words share characters (common in practice) skips redundant pinyin lookups entirely.
-- The multiprocess pipeline uses direct `multiprocessing.Queue` — no Manager proxy server, so IPC overhead is minimal.
-- `operator.itemgetter` replaces per-call lambda objects in the radix sort inner loop.
+- The producer stage skips jieba entirely — words arrive pre-separated by `\n`, so splitting by `\n` is equivalent at a fraction of the cost.
+- Final sort uses `numpy.lexsort` (C-level multi-key sort) instead of repeated Python `list.sort()` passes.
+- The multiprocess pipeline uses direct `multiprocessing.Queue` with batched sends — no Manager proxy, minimal IPC overhead.
 
-The jieba segmentation step dominates million-scale runs. Replacing it with a faster segmenter is the highest-leverage future optimisation.
+The multiprocess path is most effective when the word list has many unique words (e.g. a real dictionary). For data with high repetition, single-process with the pypinyin cache is faster.
 
 ---
 

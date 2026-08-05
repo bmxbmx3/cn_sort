@@ -36,7 +36,7 @@ with open("README.md", "r", encoding="utf-8") as f:
 
 setup(
     name="cn_sort",
-    version="0.13.0",
+    version="0.14.0",
     license="MIT",
     description="按拼音和笔顺快速排序大量简体中文词组（支持百万数量级）。",
     long_description=long_description,
@@ -50,7 +50,8 @@ setup(
     ],
     install_requires=[
         "pypinyin",
-        "jieba"
+        "jieba",
+        "numpy"
     ],
     classifiers=[
         "Development Status :: 4 - Beta",
