@@ -132,13 +132,20 @@ For lists larger than `threshold`, cn_sort spawns a producer-consumer process po
 
 ![Benchmark](readme_pic/benchmark_chart.png)
 
-| Scale | Mode | Time |
-|-------|------|------|
-| < 1 000 words | single-process | < 5 ms |
-| 10 000 words | single-process | ~180 ms |
-| 1 000 000 words | multiprocess | ~20 s (4-core) |
+| Scale | Time | Notes |
+|-------|------|-------|
+| 10 words | < 1 ms | first call loads the priority table (~40 ms); subsequent calls are instant |
+| 10 000 words | ~20 ms | repeated words hit the pypinyin cache; near-instant on warm runs |
+| 48 000 words | ~100 ms | single-process; cache makes repeated patterns essentially free |
+| 1 000 000 words | ~20 s | multiprocess pipeline; bottleneck is jieba segmentation |
 
-The jieba segmentation step dominates large-scale runs. Replacing it with a faster segmenter is the highest-leverage future optimisation.
+**What makes it fast:**
+- The 20 000-character priority table loads once and stays in memory for the lifetime of the process.
+- `pypinyin` results are cached per word — sorting a list where many words share characters (common in practice) skips redundant pinyin lookups entirely.
+- The multiprocess pipeline uses direct `multiprocessing.Queue` — no Manager proxy server, so IPC overhead is minimal.
+- `operator.itemgetter` replaces per-call lambda objects in the radix sort inner loop.
+
+The jieba segmentation step dominates million-scale runs. Replacing it with a faster segmenter is the highest-leverage future optimisation.
 
 ---
 

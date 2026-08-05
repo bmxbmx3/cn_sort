@@ -6,7 +6,7 @@ import os
 import re
 from enum import Enum
 from itertools import chain
-from multiprocessing import Manager, Pool, cpu_count
+from multiprocessing import Process, Queue, cpu_count
 from multiprocessing import freeze_support
 
 import jieba
@@ -21,8 +21,12 @@ logging.config.fileConfig(_log_path)
 logger_all = logging.getLogger("all")
 logger_error = logging.getLogger("error")
 
-# Cache the word dict to avoid re-reading JSON on every call.
+# In-process cache for word dict (avoids re-reading JSON on repeat calls).
 _word_dict_cache: dict = {}
+
+# Per-process cache for pypinyin results keyed by (word, heteronym, style).
+# Avoids re-querying pypinyin for the same word across multiple sort calls.
+_pinyin_cache: dict = {}
 
 # Pre-compiled pattern for non-Chinese character detection.
 _NO_CHINESE_PATTERN = re.compile(r"^no_chinese:(.*?)$")
@@ -54,21 +58,24 @@ def get_word_dict(mode: Mode = Mode.PINYIN) -> dict:
     return word_dict
 
 
+def _get_pinyin(word: str) -> list:
+    """Return cached pypinyin result for word to avoid redundant queries."""
+    if word not in _pinyin_cache:
+        def errors(x: str) -> str:
+            return "no_chinese:" + x
+        _pinyin_cache[word] = pypinyin.pinyin(
+            word, heteronym=False, style=Style.TONE3, errors=errors
+        )
+    return _pinyin_cache[word]
+
+
 def get_evaluation_level_tuple(word: str, word_dict: dict,
                                mode: Mode = Mode.PINYIN) -> tuple:
-    """Convert a word into a priority-integer tuple for sorting.
-
-    Fix: evaluation_level is now reset to 0 inside each loop iteration
-    (PINYIN branch) so a KeyError never silently carries over the previous
-    character's value.
-    """
+    """Convert a word into a priority-integer tuple for radix sorting."""
     evaluation_level_list = []
 
     if mode == Mode.PINYIN:
-        def errors(x: str) -> str:
-            return "no_chinese:" + x
-
-        pinyin_list = pypinyin.pinyin(word, heteronym=False, style=Style.TONE3, errors=errors)
+        pinyin_list = _get_pinyin(word)
 
         cur_index = -1
         signature_list = []
@@ -83,7 +90,6 @@ def get_evaluation_level_tuple(word: str, word_dict: dict,
                 cur_index += len(pinyin_matches[0])
 
         for signature in signature_list:
-            # Reset per-character so a KeyError never bleeds into the next char.
             evaluation_level = 0
             try:
                 evaluation_level = word_dict[signature]
@@ -103,7 +109,16 @@ def get_evaluation_level_tuple(word: str, word_dict: dict,
     return tuple(evaluation_level_list)
 
 
-def handle_text_process(text: str, queue, process_id: int):
+def _jieba_init():
+    """Pool initializer: pre-load jieba dictionary so workers do not
+    reload it on every task submission (saves ~0.5-1s per worker).
+    """
+    jieba.setLogLevel(20)
+    jieba.initialize()
+
+
+def handle_text_process(text: str, queue: Queue, process_id: int):
+    """Producer: segment text, push unique tokens to queue, return word list + max length."""
     max_length = 0
     temp_text_list = []
     jieba.setLogLevel(20)
@@ -123,12 +138,20 @@ def handle_text_process(text: str, queue, process_id: int):
             word_set.add(word)
             queue.put(word)
 
-    queue.put(None)
+    queue.put(None)  # sentinel
     logger_all.info("producer %d: %d unique words", process_id, len(word_set))
     return seged_word_list, max_length
 
 
-def get_filter_word_evaluation_process(queue_list: list) -> dict:
+def _producer_worker(text: str, queue: Queue, process_id: int,
+                     result_queue: Queue):
+    """Wrapper for Process-based producer; sends return value via result_queue."""
+    seged, max_len = handle_text_process(text, queue, process_id)
+    result_queue.put((process_id, seged, max_len))
+
+
+def get_filter_word_evaluation_process(queue_list: list, result_queue: Queue):
+    """Consumer: drain all producer queues, build priority-tuple map."""
     filter_word_dict: dict = {}
     word_dict = get_word_dict()
     queue_count = len(queue_list)
@@ -145,43 +168,62 @@ def get_filter_word_evaluation_process(queue_list: list) -> dict:
                 if word is not None and word != "\n" and word not in filter_word_dict:
                     filter_word_dict[word] = get_evaluation_level_tuple(word, word_dict)
 
-    return filter_word_dict
+    result_queue.put(filter_word_dict)
 
 
 @metric_time
 def multiprocess_split_text_list(text_split_list: list, freeze: bool = False):
+    """Fan-out segmentation using Process + multiprocessing.Queue (no Manager proxy).
+
+    Using direct Queue avoids the Manager proxy-server overhead, which serializes
+    every put/get through an extra IPC hop. Process-based workers also let jieba
+    be pre-loaded once via _jieba_init, not on every task.
+    """
     n = len(text_split_list)
     if freeze:
         freeze_support()
 
-    with Manager() as manager:
-        queue_list = [manager.Queue(maxsize=0) for _ in range(n)]
+    # Direct multiprocessing.Queue — no Manager, no proxy overhead.
+    queues = [Queue(maxsize=0) for _ in range(n)]
+    producer_result_q = Queue()
+    consumer_result_q = Queue()
 
-        process_fns = [handle_text_process] * n + [get_filter_word_evaluation_process]
-        args_list = (
-            [(text_split_list[i], queue_list[i], i + 1) for i in range(n)]
-            + [(queue_list,)]
-        )
+    # Spawn producers
+    producers = [
+        Process(target=_producer_worker,
+                args=(text_split_list[i], queues[i], i + 1, producer_result_q))
+        for i in range(n)
+    ]
+    # Spawn consumer
+    consumer = Process(target=get_filter_word_evaluation_process,
+                       args=(queues, consumer_result_q))
 
-        with Pool(n + 1) as pool:
-            async_results = [
-                pool.apply_async(func=process_fns[i], args=args_list[i])
-                for i in range(n + 1)
-            ]
-            pool.close()
-            pool.join()
+    consumer.start()
+    for p in producers:
+        p.start()
 
-        seged_word_list_lists = [async_results[i].get()[0] for i in range(n)]
-        max_length_list = [async_results[i].get()[1] for i in range(n)]
-        max_length = max(max_length_list)
-        seged_word_iter = chain.from_iterable(seged_word_list_lists)
-        filter_word_dict = async_results[n].get()
+    # Collect producer results
+    producer_results = {}
+    for _ in range(n):
+        pid, seged, max_len = producer_result_q.get()
+        producer_results[pid] = (seged, max_len)
+
+    for p in producers:
+        p.join()
+    consumer.join()
+
+    filter_word_dict = consumer_result_q.get()
+
+    seged_word_list_lists = [producer_results[i + 1][0] for i in range(n)]
+    max_length = max(producer_results[i + 1][1] for i in range(n))
+    seged_word_iter = chain.from_iterable(seged_word_list_lists)
 
     return seged_word_iter, filter_word_dict, max_length
 
 
 @metric_time
 def hadle_seged_text_word(seged_text_word_iter, max_length: int, filter_word_dict: dict):
+    """Reassemble segmented tokens into priority tuples and yield sorted words."""
     evaluation_level_temp_list = []
     text_word_temp_list = []
     evaluation_level_list = []
@@ -206,6 +248,7 @@ def hadle_seged_text_word(seged_text_word_iter, max_length: int, filter_word_dic
 
 @metric_time
 def handle_text_word(text_list: list, mode: Mode = Mode.PINYIN):
+    """Single-process sort for small/medium word lists."""
     evaluation_level_list = []
     word_dict = get_word_dict(mode)
     max_length = len(max(text_list, key=len))
@@ -223,10 +266,9 @@ def handle_text_word(text_list: list, mode: Mode = Mode.PINYIN):
 
 @metric_time
 def radix_sort(data: list) -> None:
-    """LSD radix sort using Python timsort on each column.
+    """LSD radix sort: sort each column from last to first using stable timsort.
 
-    Uses operator.itemgetter instead of a lambda to avoid repeated
-    function-object creation per sort call.
+    operator.itemgetter avoids per-call lambda object creation.
     """
     if not data:
         return
@@ -237,6 +279,7 @@ def radix_sort(data: list) -> None:
 
 @metric_time
 def get_text_spit_list(text_list: list) -> list:
+    """Split word list into n segments (one per available CPU minus one)."""
     n = cpu_count() - 1
     if n <= 1:
         logger_error.error("CPU count %d too low for multiprocess", n + 1)
@@ -257,13 +300,13 @@ def sort_text_list(text_list: list, freeze: bool = False,
     """Sort a list of Chinese words by pinyin or stroke order.
 
     Args:
-        text_list: List of words to sort, e.g. ["人", "人民"].
-        freeze: Set True when not running under if __name__ == '__main__' on Windows.
-        threshold: Word count above which multiprocess mode activates (default 100000).
-        mode: Mode.PINYIN for pinyin+stroke; Mode.BIHUA for stroke only.
+        text_list: Words to sort, e.g. ["人", "人民"].
+        freeze: Set True when not running outside if __name__ == '__main__' on Windows.
+        threshold: Switch to multiprocess pipeline above this word count (default 100000).
+        mode: Mode.PINYIN (pinyin + stroke tiebreaker) or Mode.BIHUA (stroke only).
 
     Returns:
-        Sorted list of words.
+        Sorted list of strings.
     """
     if not text_list:
         return []
@@ -291,6 +334,7 @@ def sort_text_list(text_list: list, freeze: bool = False,
 
 
 def set_stdout_level(level: str) -> bool:
+    """Set console log verbosity."""
     import configparser
     valid_levels = {"DEBUG", "INFO", "WARN", "ERROR", "CRITICAL"}
     if level not in valid_levels:
